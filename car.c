@@ -54,7 +54,8 @@ int main(int argc, char **argv)
   validate_floor_range(highest_floor);
   compare_highest_lowest(lowest_floor, highest_floor);
 
-  strcpy(car->name, argv[1]);
+  strcpy(car->name, "/car");
+  strcat(car->name, argv[1]);
   car->lowest_floor = lowest_floor;
   car->highest_floor = highest_floor;
   car->delay_ms = atoi(argv[4]);
