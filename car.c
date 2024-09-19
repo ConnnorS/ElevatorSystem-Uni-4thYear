@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <pthread.h>
+
+#include "car_helpers.h"
 
 typedef struct
 {
@@ -22,8 +25,8 @@ typedef struct
 typedef struct
 {
   char name[32];
-  char lowest_floor[4];
-  char highest_floor[4];
+  int lowest_floor;
+  int highest_floor;
   int delay_ms;
 } car_info;
 
@@ -31,6 +34,36 @@ typedef struct
 {name} {lowest floor} {highest floor} {delay} */
 int main(int argc, char **argv)
 {
+  if (argc != 5)
+  {
+    printf("Useage %s {name} {lowest floor} {highest floor} {delay}\n", argv[0]);
+    exit(1);
+  }
 
+  car_info *car = malloc(sizeof(car_info));
+
+  // convert the basement floors to a negative number for easier comparison
+  if (argv[2][0] == 'B')
+    argv[2][0] = '-';
+  if (argv[3][0] == 'B')
+    argv[3][0] = '-';
+
+  const int lowest_floor = atoi(argv[2]);
+  const int highest_floor = atoi(argv[3]);
+  validate_floor_range(lowest_floor);
+  validate_floor_range(highest_floor);
+  compare_highest_lowest(lowest_floor, highest_floor);
+
+  strcpy(car->name, argv[1]);
+  car->lowest_floor = lowest_floor;
+  car->highest_floor = highest_floor;
+  car->delay_ms = atoi(argv[4]);
+
+  printf("Car Name: %s\n", car->name);
+  printf("Lowest Floor: %d\n", car->lowest_floor);
+  printf("Highest Floor: %d\n", car->highest_floor);
+  printf("Delay (ms): %d\n", car->delay_ms);
+
+  free(car);
   return 0;
 }
