@@ -62,6 +62,7 @@ int main(int argc, char **argv)
   strcpy((char *)lowest_floor_char, argv[2]);
   const char highest_floor_char[4];
   strcpy((char *)highest_floor_char, argv[3]);
+  
   // convert the basement floors to a negative number for easier comparison
   if (argv[2][0] == 'B')
     argv[2][0] = '-';
@@ -82,50 +83,17 @@ int main(int argc, char **argv)
   strcpy(car->highest_floor, highest_floor_char);
   car->delay_ms = atoi(argv[4]);
 
-  // for testing
-  print_car_info(car);
-
   /* car shared memory creation for internal system */
-  // setup the names and info
   const int shm_status_size = sizeof(car_shared_mem);
   char *shm_status_name = car->name;
   int shm_status_fd;
   car_shared_mem *shm_status_ptr;
 
-  // create the shared memory object
-  shm_unlink(shm_status_name); // unlink any old objects just in case
-  shm_status_fd = shm_open(shm_status_name, O_CREAT | O_RDWR, 0666);
-  if (shm_status_fd == -1)
-  {
-    perror("shm_open()");
-    exit(1);
-  }
-  // set the size of the shared memory object
-  int ftruncate_success = ftruncate(shm_status_fd, shm_status_size);
-  if (ftruncate_success == -1)
-  {
-    perror("ftruncate");
-    exit(1);
-  }
-  // map the shared object
+  shm_status_fd = do_shm_open(shm_status_name);
+  do_ftruncate(shm_status_fd, shm_status_size);
   shm_status_ptr = mmap(0, shm_status_size, PROT_WRITE | PROT_READ, MAP_SHARED, shm_status_fd, 0);
 
-  // add in default values into the shared memory object
-  pthread_mutex_init(&shm_status_ptr->mutex, NULL);
-  pthread_cond_init(&shm_status_ptr->cond, NULL);
-  strcpy(shm_status_ptr->current_floor, lowest_floor_char);
-  strcpy(shm_status_ptr->destination_floor, lowest_floor_char);
-  strcpy(shm_status_ptr->status, "Closed");
-  shm_status_ptr->open_button = 0;
-  shm_status_ptr->close_button = 0;
-  shm_status_ptr->door_obstruction = 0;
-  shm_status_ptr->overload = 0;
-  shm_status_ptr->emergency_stop = 0;
-  shm_status_ptr->individual_service_mode = 0;
-  shm_status_ptr->emergency_mode = 0;
-
-  // for testing
-  print_car_shared_mem(shm_status_ptr, shm_status_name);
+  add_default_values(shm_status_ptr, lowest_floor_char);
 
   // for testing
   while (1)
