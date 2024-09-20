@@ -11,30 +11,6 @@
 // my functions
 #include "car_helpers.h"
 
-typedef struct
-{
-  pthread_mutex_t mutex;           // Locked while accessing struct contents
-  pthread_cond_t cond;             // Signalled when the contents change
-  char current_floor[4];           // C string in the range B99-B1 and 1-999
-  char destination_floor[4];       // Same format as above
-  char status[8];                  // C string indicating the elevator's status
-  uint8_t open_button;             // 1 if open doors button is pressed, else 0
-  uint8_t close_button;            // 1 if close doors button is pressed, else 0
-  uint8_t door_obstruction;        // 1 if obstruction detected, else 0
-  uint8_t overload;                // 1 if overload detected
-  uint8_t emergency_stop;          // 1 if stop button has been pressed, else 0
-  uint8_t individual_service_mode; // 1 if in individual service mode, else 0
-  uint8_t emergency_mode;          // 1 if in emergency mode, else 0
-} car_shared_mem;
-
-typedef struct
-{
-  char name[32];
-  char lowest_floor[4];
-  char highest_floor[4];
-  int delay_ms;
-} car_info;
-
 void print_car_shared_mem(const car_shared_mem *shared_mem, const char *name)
 {
   if (shared_mem == NULL)
@@ -117,11 +93,22 @@ int main(int argc, char **argv)
   car_shared_mem *shm_status_ptr;
 
   // create the shared memory object
+  shm_unlink(shm_status_name); // unlink any old objects just in case
   shm_status_fd = shm_open(shm_status_name, O_CREAT | O_RDWR, 0666);
+  if (shm_status_fd == -1)
+  {
+    perror("shm_open()");
+    exit(1);
+  }
   // set the size of the shared memory object
-  ftruncate(shm_status_fd, shm_status_size);
+  int ftruncate_success = ftruncate(shm_status_fd, shm_status_size);
+  if (ftruncate_success == -1)
+  {
+    perror("ftruncate");
+    exit(1);
+  }
   // map the shared object
-  shm_status_ptr = mmap(0, shm_status_size, PROT_WRITE, MAP_SHARED, shm_status_fd, 0);
+  shm_status_ptr = mmap(0, shm_status_size, PROT_WRITE | PROT_READ, MAP_SHARED, shm_status_fd, 0);
 
   // add in default values into the shared memory object
   pthread_mutex_init(&shm_status_ptr->mutex, NULL);
@@ -139,6 +126,10 @@ int main(int argc, char **argv)
 
   // for testing
   print_car_shared_mem(shm_status_ptr, shm_status_name);
+
+  // for testing
+  while (1)
+    ;
 
   /* process cleanup */
   shm_unlink(shm_status_name);
