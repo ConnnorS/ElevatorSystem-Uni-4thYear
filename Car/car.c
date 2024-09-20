@@ -8,6 +8,8 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
+// networks
+#include <arpa/inet.h>
 // my functions
 #include "car_helpers.h"
 
@@ -62,7 +64,7 @@ int main(int argc, char **argv)
   strcpy((char *)lowest_floor_char, argv[2]);
   const char highest_floor_char[4];
   strcpy((char *)highest_floor_char, argv[3]);
-  
+
   // convert the basement floors to a negative number for easier comparison
   if (argv[2][0] == 'B')
     argv[2][0] = '-';
