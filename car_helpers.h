@@ -1,3 +1,5 @@
+#define CAR_NAME_LENGTH 32
+
 typedef struct
 {
   pthread_mutex_t mutex;           // Locked while accessing struct contents
@@ -16,12 +18,11 @@ typedef struct
 
 typedef struct
 {
-  char name[32];
+  char name[CAR_NAME_LENGTH];
   char lowest_floor[4];
   char highest_floor[4];
   int delay_ms;
 } car_info;
-
 
 void validate_floor_range(int floor);
 void compare_highest_lowest(int lowest, int highest);

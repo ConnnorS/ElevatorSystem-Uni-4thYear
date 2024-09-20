@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
 void validate_floor_range(int floor)
 {
   if (floor < -99)
