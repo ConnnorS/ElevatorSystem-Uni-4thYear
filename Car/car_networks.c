@@ -41,3 +41,16 @@ int connect_to_control_system()
 
   return socketFd;
 }
+
+int sendMessage(int socketFd, const char *message)
+{
+  int message_length = strlen(message);
+  int network_length = htonl(message_length);
+  send(socketFd, &network_length, sizeof(network_length), 0);
+  if (send(socketFd, message, message_length, 0) != message_length)
+  {
+    printf("Send did not send all data\n");
+    return -1;
+  }
+  return 0;
+}

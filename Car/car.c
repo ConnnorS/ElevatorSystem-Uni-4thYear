@@ -48,6 +48,51 @@ void print_car_info(const car_info *car)
   printf("\n");
 }
 
+typedef struct connect_data
+{
+  int socketFd;
+  car_info *info;
+  car_shared_mem *status;
+} connect_data_t;
+
+void *do_connect_to_control_system(void *arg)
+{
+  /* connect to the control system */
+  connect_data_t *data;
+  data = arg;
+  printf("Attempting to connect to control system...\n");
+  while (data->socketFd == -1)
+  {
+    data->socketFd = connect_to_control_system();
+    sleep(data->info->delay_ms / 1000);
+  }
+  printf("Connection successful\n");
+
+  /* send the initial car identication data */
+  char car_data[32];
+  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", data->info->name, data->info->lowest_floor, data->info->highest_floor);
+  while (1)
+  {
+    if (sendMessage(data->socketFd, (char *)car_data) != -1)
+      break;
+    sleep(data->info->delay_ms / 1000);
+  }
+  printf("Successful identification message send\n");
+
+  /* send the car status data */
+  char status_data[32];
+  snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", data->status->status, data->status->current_floor, data->status->destination_floor);
+  while (1)
+  {
+    if (sendMessage(data->socketFd, (char *)status_data) != -1)
+      break;
+    sleep(data->info->delay_ms / 1000);
+  }
+  printf("Successful status message send\n");
+
+  return NULL;
+}
+
 /* expected CL-arguments
 {name} {lowest floor} {highest floor} {delay} */
 int main(int argc, char **argv)
@@ -98,16 +143,14 @@ int main(int argc, char **argv)
 
   add_default_values(shm_status_ptr, lowest_floor_char);
 
-  printf("Attempting server connect...\n");
-  int connect = connect_to_control_system();
-  if (connect == -1)
-  {
-    printf("Error\n");
-  }
-  else
-  {
-    printf("Connected!\n");
-  }
+  /* connect to control system over TCP */
+  connect_data_t connect;
+  connect.socketFd = -1;
+  connect.info = car;
+  connect.status = shm_status_ptr;
+
+  pthread_t controller_connection_thread;
+  pthread_create(&controller_connection_thread, NULL, do_connect_to_control_system, &connect);
 
   // for testing
   while (1)
