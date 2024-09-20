@@ -93,11 +93,22 @@ int main(int argc, char **argv)
   car_shared_mem *shm_status_ptr;
 
   // create the shared memory object
+  shm_unlink(shm_status_name); // unlink any old objects just in case
   shm_status_fd = shm_open(shm_status_name, O_CREAT | O_RDWR, 0666);
+  if (shm_status_fd == -1)
+  {
+    perror("shm_open()");
+    exit(1);
+  }
   // set the size of the shared memory object
-  ftruncate(shm_status_fd, shm_status_size);
+  int ftruncate_success = ftruncate(shm_status_fd, shm_status_size);
+  if (ftruncate_success == -1)
+  {
+    perror("ftruncate");
+    exit(1);
+  }
   // map the shared object
-  shm_status_ptr = mmap(0, shm_status_size, PROT_WRITE, MAP_SHARED, shm_status_fd, 0);
+  shm_status_ptr = mmap(0, shm_status_size, PROT_WRITE | PROT_READ, MAP_SHARED, shm_status_fd, 0);
 
   // add in default values into the shared memory object
   pthread_mutex_init(&shm_status_ptr->mutex, NULL);
@@ -117,7 +128,8 @@ int main(int argc, char **argv)
   print_car_shared_mem(shm_status_ptr, shm_status_name);
 
   // for testing
-  sleep(10);
+  while (1)
+    ;
 
   /* process cleanup */
   shm_unlink(shm_status_name);

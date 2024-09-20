@@ -82,6 +82,7 @@ int main(int argc, char **argv)
   shm_status_fd = shm_open((char *)car_name, O_RDWR, 0666);
   shm_status_ptr = mmap(0, shm_status_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_status_fd, 0);
 
+  // for testing
   print_car_shared_mem(shm_status_ptr, car_name);
 
   return 0;
