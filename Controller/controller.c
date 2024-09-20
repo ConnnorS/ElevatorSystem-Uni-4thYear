@@ -12,10 +12,21 @@
 #include <arpa/inet.h>
 // my functions
 #include "controller_helpers.h"
+#include "./Car/car_helpers.h"
+
+typedef struct car_status
+{
+  char name[CAR_NAME_LENGTH];
+  char status[8];
+  char current_floor[4];
+  char destination_floor[4];
+} car_status_t;
 
 /* expects no command line arguments */
 int main(void)
 {
+  car_status_t *car_status_list[] = malloc(sizeof(car_status_t));
+
   int serverFd = create_server();
 
   struct sockaddr clientaddr;
@@ -32,7 +43,10 @@ int main(void)
     while (1)
     {
       char *message = receive_message(clientFd);
-      printf("Received %s\n", message);
+      if (strncmp(message, "STATUS", 6) == 0)
+      {
+        printf("Received status message\n");
+      }
       if (message == NULL) // connection closed by elevator, break the loop and listen again
       {
         break;
@@ -42,5 +56,6 @@ int main(void)
   }
   close(clientFd);
 
+  free(car_status_list);
   return 0;
 }

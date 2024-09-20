@@ -28,6 +28,8 @@ int create_server()
   }
 
   /* bind the socket to an actual IP and port */
+  int opt_enable = 1;
+  setsockopt(serverFd, SOL_SOCKET, SO_REUSEADDR, &opt_enable, sizeof(opt_enable));
   if (bind(serverFd, (const struct sockaddr *)&addr, sizeof(addr)) == -1)
   {
     perror("bind()");
@@ -63,8 +65,12 @@ char *receive_message(int fd)
     fprintf(stderr, "recv got invalid legnth message\nExpected: %d got %d\n", length, received_length);
     return NULL;
   }
-  
+
   message[length] = '\0';
-  
+
   return message;
+}
+
+void handle_received_status_message()
+{
 }
