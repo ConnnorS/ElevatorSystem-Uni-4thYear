@@ -56,6 +56,7 @@ int main(void)
   close(clientFd);
 
   free(car_list);
+  free(car_status_list);
 
   return 0;
 }
