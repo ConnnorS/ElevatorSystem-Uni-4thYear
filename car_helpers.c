@@ -32,3 +32,4 @@ void compare_highest_lowest(int lowest, int highest)
     exit(1);
   }
 }
+
