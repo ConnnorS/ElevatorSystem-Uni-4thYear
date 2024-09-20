@@ -49,7 +49,7 @@ void *do_connect_to_control_system(void *arg)
 
     /* send the car status data */
     char status_data[32];
-    snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", data->status->status, data->status->current_floor, data->status->destination_floor);
+    snprintf(status_data, sizeof(status_data), "STATUS %s %s %s %s", data->info->name, data->status->status, data->status->current_floor, data->status->destination_floor);
     while (1)
     {
       if (sendMessage(data->socketFd, (char *)status_data) != -1)
