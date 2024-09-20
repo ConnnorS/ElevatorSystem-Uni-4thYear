@@ -10,6 +10,8 @@
 #include <unistd.h>
 // networks
 #include <arpa/inet.h>
+// my functions
+#include "controller_helpers.h"
 
 int create_server()
 {
@@ -71,6 +73,7 @@ char *receive_message(int fd)
   return message;
 }
 
-void handle_received_status_message()
+void handle_received_status_message(car_status_t *car_status_list, char *message)
 {
+  
 }
