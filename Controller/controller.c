@@ -16,7 +16,6 @@
 /* expects no command line arguments */
 int main(void)
 {
-  // listen for data from the cars
   int serverFd = create_server();
 
   struct sockaddr clientaddr;
@@ -30,11 +29,18 @@ int main(void)
       perror("accept()");
       continue; // try again, don't run the rest of the code
     }
-
-    char *message = receive_message(clientFd);
-    if (message == NULL) printf("Failed\n");
-    printf("Received %s\n", message);
+    while (1)
+    {
+      char *message = receive_message(clientFd);
+      printf("Received %s\n", message);
+      if (message == NULL) // connection closed by elevator, break the loop and listen again
+      {
+        break;
+      }
+      free(message);
+    }
   }
-  
+  close(clientFd);
+
   return 0;
 }
