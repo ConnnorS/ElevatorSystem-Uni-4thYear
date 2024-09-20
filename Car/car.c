@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 // my functions
 #include "car_helpers.h"
+#include "car_networks.h"
 
 void print_car_shared_mem(const car_shared_mem *shared_mem, const char *name)
 {
@@ -96,6 +97,17 @@ int main(int argc, char **argv)
   shm_status_ptr = mmap(0, shm_status_size, PROT_WRITE | PROT_READ, MAP_SHARED, shm_status_fd, 0);
 
   add_default_values(shm_status_ptr, lowest_floor_char);
+
+  printf("Attempting server connect...\n");
+  int connect = connect_to_control_system();
+  if (connect == -1)
+  {
+    printf("Error\n");
+  }
+  else
+  {
+    printf("Connected!\n");
+  }
 
   // for testing
   while (1)
