@@ -34,22 +34,22 @@ void *do_connect_to_control_system(void *arg)
   }
   printf("Connection successful\n");
 
+  /* send the initial car identication data */
+  char car_data[32];
+  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", data->info->name, data->info->lowest_floor, data->info->highest_floor);
   while (1)
   {
-    /* send the initial car identication data */
-    char car_data[32];
-    snprintf(car_data, sizeof(car_data), "CAR %s %s %s", data->info->name, data->info->lowest_floor, data->info->highest_floor);
-    while (1)
-    {
-      if (sendMessage(data->socketFd, (char *)car_data) != -1)
-        break;
-      sleep(data->info->delay_ms / 1000);
-    }
-    printf("Successful identification message send\n");
+    if (sendMessage(data->socketFd, (char *)car_data) != -1)
+      break;
+    sleep(data->info->delay_ms / 1000);
+  }
+  printf("Successful identification message send\n");
 
+  while (1)
+  {
     /* send the car status data */
     char status_data[32];
-    snprintf(status_data, sizeof(status_data), "STATUS %s %s %s %s", data->info->name, data->status->status, data->status->current_floor, data->status->destination_floor);
+    snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", data->status->status, data->status->current_floor, data->status->destination_floor);
     while (1)
     {
       if (sendMessage(data->socketFd, (char *)status_data) != -1)

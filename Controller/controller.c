@@ -13,50 +13,58 @@
 // my functions
 #include "controller_helpers.h"
 
-/* expects no command line arguments */
+void *handle_client(void *arg)
+{
+  client_t client = *(client_t *)arg;
+  while (1)
+  {
+    char *message = receive_message(client.fd);
+    if (message == NULL)
+    {
+      return NULL;
+    }
+    else if (strncmp(message, "CAR", 3) == 0)
+    {
+      handle_received_car_message(&client, message);
+    }
+    else if (strncmp(message, "STATUS", 6) == 0)
+    {
+      handle_received_status_message(&client, message);
+    }
+  }
+
+  return NULL;
+}
+
 int main(void)
 {
-  controller_car_info *car_list = malloc(sizeof(controller_car_info));
-  int car_list_count = 1;
+  client_t *clients = malloc(0);
+  int client_count = 0;
 
-  car_status_info *car_status_list = malloc(sizeof(car_status_info));
-  int car_status_list_count = 1;
-
+  int new_socket;
   int serverFd = create_server();
 
   struct sockaddr clientaddr;
   socklen_t clientaddr_len;
-  int clientFd;
+
   while (1)
   {
-    clientFd = accept(serverFd, &clientaddr, &clientaddr_len);
-    if (clientFd == -1)
+    new_socket = accept(serverFd, (struct sockaddr *)&clientaddr, &clientaddr_len);
+    if (new_socket >= 0)
     {
-      perror("accept()");
-      continue; // try again, don't run the rest of the code
+      clients = realloc(clients, (client_count + 1) * sizeof(client_t));
+      clients[client_count].fd = new_socket;
+      pthread_t new_client_thread;
+      pthread_create(&new_client_thread, NULL, handle_client, (void *)&clients[client_count]);
+      client_count++;
     }
-    while (1)
+    else
     {
-      char *message = receive_message(clientFd);
-      if (strncmp(message, "CAR", 3) == 0)
-      {
-        handle_received_car_message(&car_list, message, &car_list_count);
-      }
-      else if (strncmp(message, "STATUS", 6) == 0)
-      {
-        handle_received_status_message(&car_status_list, message, &car_status_list_count);
-      }
-      if (message == NULL) // connection closed by elevator, break the loop and listen again
-      {
-        break;
-      }
-      free(message);
+      printf("Max clients reached. Connection rejected\n");
+      close(new_socket);
     }
   }
-  close(clientFd);
 
-  free(car_list);
-  free(car_status_list);
-
+  free(clients);
   return 0;
 }
