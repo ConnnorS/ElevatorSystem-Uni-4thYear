@@ -8,8 +8,11 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
+// networks
+#include <arpa/inet.h>
 // my functions
 #include "car_helpers.h"
+#include "car_networks.h"
 
 void print_car_shared_mem(const car_shared_mem *shared_mem, const char *name)
 {
@@ -45,6 +48,51 @@ void print_car_info(const car_info *car)
   printf("\n");
 }
 
+typedef struct connect_data
+{
+  int socketFd;
+  car_info *info;
+  car_shared_mem *status;
+} connect_data_t;
+
+void *do_connect_to_control_system(void *arg)
+{
+  /* connect to the control system */
+  connect_data_t *data;
+  data = arg;
+  printf("Attempting to connect to control system...\n");
+  while (data->socketFd == -1)
+  {
+    data->socketFd = connect_to_control_system();
+    sleep(data->info->delay_ms / 1000);
+  }
+  printf("Connection successful\n");
+
+  /* send the initial car identication data */
+  char car_data[32];
+  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", data->info->name, data->info->lowest_floor, data->info->highest_floor);
+  while (1)
+  {
+    if (sendMessage(data->socketFd, (char *)car_data) != -1)
+      break;
+    sleep(data->info->delay_ms / 1000);
+  }
+  printf("Successful identification message send\n");
+
+  /* send the car status data */
+  char status_data[32];
+  snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", data->status->status, data->status->current_floor, data->status->destination_floor);
+  while (1)
+  {
+    if (sendMessage(data->socketFd, (char *)status_data) != -1)
+      break;
+    sleep(data->info->delay_ms / 1000);
+  }
+  printf("Successful status message send\n");
+
+  return NULL;
+}
+
 /* expected CL-arguments
 {name} {lowest floor} {highest floor} {delay} */
 int main(int argc, char **argv)
@@ -62,6 +110,7 @@ int main(int argc, char **argv)
   strcpy((char *)lowest_floor_char, argv[2]);
   const char highest_floor_char[4];
   strcpy((char *)highest_floor_char, argv[3]);
+
   // convert the basement floors to a negative number for easier comparison
   if (argv[2][0] == 'B')
     argv[2][0] = '-';
@@ -82,50 +131,26 @@ int main(int argc, char **argv)
   strcpy(car->highest_floor, highest_floor_char);
   car->delay_ms = atoi(argv[4]);
 
-  // for testing
-  print_car_info(car);
-
   /* car shared memory creation for internal system */
-  // setup the names and info
   const int shm_status_size = sizeof(car_shared_mem);
   char *shm_status_name = car->name;
   int shm_status_fd;
   car_shared_mem *shm_status_ptr;
 
-  // create the shared memory object
-  shm_unlink(shm_status_name); // unlink any old objects just in case
-  shm_status_fd = shm_open(shm_status_name, O_CREAT | O_RDWR, 0666);
-  if (shm_status_fd == -1)
-  {
-    perror("shm_open()");
-    exit(1);
-  }
-  // set the size of the shared memory object
-  int ftruncate_success = ftruncate(shm_status_fd, shm_status_size);
-  if (ftruncate_success == -1)
-  {
-    perror("ftruncate");
-    exit(1);
-  }
-  // map the shared object
+  shm_status_fd = do_shm_open(shm_status_name);
+  do_ftruncate(shm_status_fd, shm_status_size);
   shm_status_ptr = mmap(0, shm_status_size, PROT_WRITE | PROT_READ, MAP_SHARED, shm_status_fd, 0);
 
-  // add in default values into the shared memory object
-  pthread_mutex_init(&shm_status_ptr->mutex, NULL);
-  pthread_cond_init(&shm_status_ptr->cond, NULL);
-  strcpy(shm_status_ptr->current_floor, lowest_floor_char);
-  strcpy(shm_status_ptr->destination_floor, lowest_floor_char);
-  strcpy(shm_status_ptr->status, "Closed");
-  shm_status_ptr->open_button = 0;
-  shm_status_ptr->close_button = 0;
-  shm_status_ptr->door_obstruction = 0;
-  shm_status_ptr->overload = 0;
-  shm_status_ptr->emergency_stop = 0;
-  shm_status_ptr->individual_service_mode = 0;
-  shm_status_ptr->emergency_mode = 0;
+  add_default_values(shm_status_ptr, lowest_floor_char);
 
-  // for testing
-  print_car_shared_mem(shm_status_ptr, shm_status_name);
+  /* connect to control system over TCP */
+  connect_data_t connect;
+  connect.socketFd = -1;
+  connect.info = car;
+  connect.status = shm_status_ptr;
+
+  pthread_t controller_connection_thread;
+  pthread_create(&controller_connection_thread, NULL, do_connect_to_control_system, &connect);
 
   // for testing
   while (1)
