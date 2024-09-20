@@ -15,6 +15,7 @@
 
 void *handle_client(void *arg)
 {
+  printf("New Car Thread Created\n");
   client_t client = *(client_t *)arg;
   while (1)
   {
