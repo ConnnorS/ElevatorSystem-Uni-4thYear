@@ -8,6 +8,8 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
+// struct definitions
+#include "car_helpers.h"
 
 void verify_operation(const char operation[8])
 {
@@ -24,6 +26,12 @@ void verify_operation(const char operation[8])
   exit(1);
 }
 
+void print_operation_info(char car_name[32], char car_operation[8])
+{
+  printf("Car: %s\n", car_name);
+  printf("Operation: %s\n", car_operation);
+}
+
 /* expectes {car name} {operation}*/
 int main(int argc, char **argv)
 {
@@ -33,12 +41,14 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  const char car_name[32];
-  strcpy((char *)car_name, argv[1]);
+  const char car_name[32] = "/car";
   const char car_operation[8];
+  strcat((char *)car_name, argv[1]);
   strcpy((char *)car_operation, argv[2]);
 
   verify_operation((char *)car_operation);
+
+  print_operation_info((char *)car_name, (char *)car_operation);
 
   return 0;
 }
