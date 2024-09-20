@@ -74,5 +74,15 @@ int main(int argc, char **argv)
 
   print_operation_info((char *)car_name, (char *)car_operation);
 
+  /* shared memory opening */
+  const int shm_status_size = sizeof(car_shared_mem);
+  int shm_status_fd;
+  car_shared_mem *shm_status_ptr;
+
+  shm_status_fd = shm_open((char *)car_name, O_RDWR, 0666);
+  shm_status_ptr = mmap(0, shm_status_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_status_fd, 0);
+
+  print_car_shared_mem(shm_status_ptr, car_name);
+
   return 0;
 }
