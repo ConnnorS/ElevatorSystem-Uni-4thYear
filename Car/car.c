@@ -35,7 +35,7 @@ void *do_connect_to_control_system(void *arg)
   printf("Connection successful\n");
 
   /* send the initial car identication data */
-  char car_data[32];
+  char car_data[64];
   snprintf(car_data, sizeof(car_data), "CAR %s %s %s", data->info->name, data->info->lowest_floor, data->info->highest_floor);
   while (1)
   {

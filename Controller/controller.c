@@ -15,14 +15,15 @@
 
 void *handle_client(void *arg)
 {
-  printf("New Car Thread Created\n");
   client_t client = *(client_t *)arg;
+  printf("New Car Thread Created with fd %d\n", client.fd);
+
   while (1)
   {
     char *message = receive_message(client.fd);
     if (message == NULL)
     {
-      return NULL;
+      break;
     }
     else if (strncmp(message, "CAR", 3) == 0)
     {
@@ -33,7 +34,7 @@ void *handle_client(void *arg)
       handle_received_status_message(&client, message);
     }
   }
-
+  printf("Thread ending\n");
   return NULL;
 }
 
