@@ -38,10 +38,9 @@ void *handle_client(void *arg)
       printf("Received status message: %s\n", message);
     }
 
-    sleep(1);
     if (!sent) /* REMOVE THIS LATER */
     {
-      if (send_message(client.fd, "FLOOR 5") == -1)
+      if (send_message(client.fd, "FLOOR B9") == -1)
       {
         printf("Error sending floor request\n");
       }
@@ -53,7 +52,7 @@ void *handle_client(void *arg)
       sent = 1;
     }
   }
-  printf("Thread ending\n");
+  printf("Thread ending - car disconnected\n");
   return NULL;
 }
 

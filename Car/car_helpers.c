@@ -8,8 +8,9 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
-
+// my functions
 #include "car_helpers.h"
+#include "car_status_operations.h"
 
 void validate_floor_range(int floor)
 {
@@ -105,20 +106,6 @@ void floor_int_to_char(int floor, char *floorChar)
   }
 }
 
-void opening_doors(connect_data_t *data)
-{
-  pthread_mutex_lock(&data->status->mutex);
-  strcpy(data->status->status, "Opening");
-  pthread_mutex_unlock(&data->status->mutex);
-}
-
-void open_doors(connect_data_t *data)
-{
-  pthread_mutex_lock(&data->status->mutex);
-  strcpy(data->status->status, "Open");
-  pthread_mutex_unlock(&data->status->mutex);
-}
-
 void update_current_floor(connect_data_t *data, int current_floor)
 {
   pthread_mutex_lock(&data->status->mutex);
@@ -143,6 +130,8 @@ void change_floor(connect_data_t *data, char *destination_floor)
   pthread_mutex_unlock(&data->status->mutex);
 
   printf("Moving floors: %d -> %d\n", current_floor_int, destination_floor_int);
+
+  set_between(data);
 
   while (1)
   {
