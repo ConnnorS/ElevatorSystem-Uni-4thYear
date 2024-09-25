@@ -50,11 +50,10 @@ int create_server()
 
 void handle_received_car_message(client_t *client, char *message)
 {
-  char type[4];
   char name[32];
   char lowest_floor[4];
   char highest_floor[4];
-  sscanf(message, "%3s %31s %3s %3s", type, name, lowest_floor, highest_floor);
+  sscanf(message, "%*s %31s %3s %3s", name, lowest_floor, highest_floor);
   strcpy(client->highest_floor, highest_floor);
   strcpy(client->lowest_floor, lowest_floor);
 }
@@ -62,9 +61,8 @@ void handle_received_car_message(client_t *client, char *message)
 void handle_received_status_message(client_t *client, char *message)
 {
   // extract all the data from the message
-  char message_type[7];
   char status[8];
   char current_floor[4];
   char destination_floor[4];
-  sscanf(message, "%6s %7s %3s %3s", message_type, status, current_floor, destination_floor);
+  sscanf(message, "%*s %7s %3s %3s", status, current_floor, destination_floor);
 }

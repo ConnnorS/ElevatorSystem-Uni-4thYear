@@ -14,13 +14,8 @@
 #include "car_helpers.h"
 #include "../common_networks.h"
 
-typedef struct connect_data
-{
-  int socketFd;
-  car_info *info;
-  car_shared_mem *status;
-} connect_data_t;
-
+/* simple function to set up a TCP connection with the controller
+then return an int which is the socketFd */
 int connect_to_control_system()
 {
   // create the address
@@ -52,9 +47,36 @@ int connect_to_control_system()
   return socketFd;
 }
 
+/* this runs in it's own thread, receiving any messages from
+the controller and acting accordingly */
+void *control_system_receive_handler(void *arg)
+{
+  connect_data_t *data;
+  data = arg;
+
+  while (1)
+  {
+    char *message = receive_message(data->socketFd);
+    printf("Received message from controller: %s\n", message);
+    if (message == NULL)
+    {
+      break;
+    }
+    else if (strncmp(message, "FLOOR", 5) == 0)
+    {
+      char floor_num[4];
+      sscanf(message, "%*s %s", floor_num);
+      change_floor(data, floor_num);
+    }
+  }
+
+  printf("Receive handler thread ending\n");
+  return NULL;
+}
+
 /* calls the connect_to_control_system function pointer */
 /* handles the connection to the control system */
-void *control_system_connection_handler(void *arg)
+void *control_system_send_handler(void *arg)
 {
   /* connect to the control system */
   connect_data_t *data;
@@ -67,6 +89,10 @@ void *control_system_connection_handler(void *arg)
   }
   printf("Connection successful\n");
 
+  /* upon successful connection, spin up another thread to handle receiving messages */
+  pthread_t controller_receive_thread;
+  pthread_create(&controller_receive_thread, NULL, control_system_receive_handler, data);
+
   /* send the initial car identication data upon first connect*/
   char car_data[64];
   snprintf(car_data, sizeof(car_data), "CAR %s %s %s", data->info->name, data->info->lowest_floor, data->info->highest_floor);
@@ -76,23 +102,20 @@ void *control_system_connection_handler(void *arg)
       break;
     sleep(data->info->delay_ms / 1000);
   }
-  printf("Successful identification message send\n");
 
   /* constantly loop sending the status of the car every delay */
   while (1)
   {
     char status_data[64];
+    pthread_mutex_lock(&data->status->mutex);
     snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", data->status->status, data->status->current_floor, data->status->destination_floor);
+    pthread_mutex_unlock(&data->status->mutex);
     while (1) // constantly loop trying to send the data
     {
       if (send_message(data->socketFd, (char *)status_data) != -1)
         break;
       sleep(data->info->delay_ms / 1000);
     }
-    printf("Successful status message send\n");
-
-    char *floor = receive_message(data->socketFd);
-    printf("Received floor message: %s\n", floor);
 
     sleep(data->info->delay_ms / 1000);
   }
@@ -156,8 +179,8 @@ int main(int argc, char **argv)
   connect.info = car;
   connect.status = shm_status_ptr;
   // run all this on a seprate thread
-  pthread_t controller_connection_thread;
-  pthread_create(&controller_connection_thread, NULL, control_system_connection_handler, &connect);
+  pthread_t controller_send_thread;
+  pthread_create(&controller_send_thread, NULL, control_system_send_handler, &connect);
 
   // for testing
   while (1)

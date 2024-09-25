@@ -4,6 +4,8 @@
     "stdlib.h": "c",
     "car_helpers.h": "c",
     "controller_helpers.h": "c",
-    "inet.h": "c"
+    "inet.h": "c",
+    "unistd.h": "c",
+    "cmath": "c"
   }
 }

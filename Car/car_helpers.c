@@ -8,8 +8,9 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
-
+// my functions
 #include "car_helpers.h"
+#include "car_status_operations.h"
 
 void validate_floor_range(int floor)
 {
@@ -82,4 +83,96 @@ void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor
   shm_status_ptr->emergency_stop = 0;
   shm_status_ptr->individual_service_mode = 0;
   shm_status_ptr->emergency_mode = 0;
+}
+
+int floor_char_to_int(char *floor)
+{
+  if (floor[0] == 'B')
+  {
+    floor[0] = '-';
+  }
+  return atoi(floor);
+}
+
+void floor_int_to_char(int floor, char *floorChar)
+{
+  if (floor < 0)
+  {
+    sprintf(floorChar, "B%d", abs(floor));
+  }
+  else
+  {
+    sprintf(floorChar, "%d", floor);
+  }
+}
+
+void update_current_floor(connect_data_t *data, int current_floor)
+{
+  pthread_mutex_lock(&data->status->mutex);
+  floor_int_to_char(current_floor, data->status->current_floor);
+  pthread_mutex_unlock(&data->status->mutex);
+}
+
+void update_destination_floor(connect_data_t *data, char *destination_floor)
+{
+  pthread_mutex_lock(&data->status->mutex);
+  strcpy(data->status->destination_floor, destination_floor);
+  pthread_mutex_unlock(&data->status->mutex);
+}
+
+void change_floor(connect_data_t *data, char *destination_floor)
+{
+  update_destination_floor(data, destination_floor);
+
+  int destination_floor_int = floor_char_to_int(destination_floor);
+  pthread_mutex_lock(&data->status->mutex);
+  int current_floor_int = floor_char_to_int(data->status->current_floor);
+  pthread_mutex_unlock(&data->status->mutex);
+
+  printf("Moving floors: %d -> %d\n", current_floor_int, destination_floor_int);
+
+  set_between(data);
+
+  while (1)
+  {
+    if (current_floor_int == destination_floor_int)
+    {
+      opening_doors(data);
+      sleep(data->info->delay_ms / 1000);
+      open_doors(data);
+      return;
+    }
+
+    /* Change the floor up or down by 1 */
+    /* And if the previous current floor is -1 or 1, we will make the next
+    current floor 1 or -1 (skipping over 0)*/
+    if (current_floor_int < destination_floor_int)
+    {
+      if (current_floor_int == -1)
+      {
+        current_floor_int = 1;
+      }
+      else
+      {
+        current_floor_int++;
+      }
+    }
+    else
+    {
+      if (current_floor_int == 1)
+      {
+        current_floor_int = -1;
+      }
+      else
+      {
+        current_floor_int--;
+      }
+    }
+
+    /* now update the current floor */
+    update_current_floor(data, current_floor_int);
+
+    /* And now delay until the next step */
+    sleep(data->info->delay_ms / 1000);
+  }
 }
