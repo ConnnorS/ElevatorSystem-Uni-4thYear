@@ -28,10 +28,12 @@ void *handle_client(void *arg)
     else if (strncmp(message, "CAR", 3) == 0)
     {
       handle_received_car_message(&client, message);
+      printf("Received car message: %s\n", message);
     }
     else if (strncmp(message, "STATUS", 6) == 0)
     {
       handle_received_status_message(&client, message);
+      printf("Received status message: %s\n", message);
     }
   }
   printf("Thread ending\n");

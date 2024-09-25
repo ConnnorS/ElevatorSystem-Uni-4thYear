@@ -21,7 +21,9 @@ typedef struct connect_data
   car_shared_mem *status;
 } connect_data_t;
 
-void *do_connect_to_control_system(void *arg)
+/* calls the connect_to_control_system function pointer */
+/* handles the connection to the control system */
+void *control_system_connection_handler(void *arg)
 {
   /* connect to the control system */
   connect_data_t *data;
@@ -30,11 +32,11 @@ void *do_connect_to_control_system(void *arg)
   while (data->socketFd == -1)
   {
     data->socketFd = connect_to_control_system();
-    sleep(data->info->delay_ms / 1000);
+    sleep(data->info->delay_ms / 1000); // if failed, retry after specified delay
   }
   printf("Connection successful\n");
 
-  /* send the initial car identication data */
+  /* send the initial car identication data upon first connect*/
   char car_data[64];
   snprintf(car_data, sizeof(car_data), "CAR %s %s %s", data->info->name, data->info->lowest_floor, data->info->highest_floor);
   while (1)
@@ -45,12 +47,12 @@ void *do_connect_to_control_system(void *arg)
   }
   printf("Successful identification message send\n");
 
+  /* constantly loop sending the status of the car every delay */
   while (1)
   {
-    /* send the car status data */
-    char status_data[32];
+    char status_data[64];
     snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", data->status->status, data->status->current_floor, data->status->destination_floor);
-    while (1)
+    while (1) // constantly loop trying to send the data
     {
       if (sendMessage(data->socketFd, (char *)status_data) != -1)
         break;
@@ -121,7 +123,7 @@ int main(int argc, char **argv)
   connect.status = shm_status_ptr;
   // run all this on a seprate thread
   pthread_t controller_connection_thread;
-  pthread_create(&controller_connection_thread, NULL, do_connect_to_control_system, &connect);
+  pthread_create(&controller_connection_thread, NULL, control_system_connection_handler, &connect);
 
   // for testing
   while (1)
