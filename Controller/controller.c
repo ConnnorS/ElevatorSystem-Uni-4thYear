@@ -16,6 +16,7 @@
 
 void *handle_client(void *arg)
 {
+  int sent = 0;
   client_t client = *(client_t *)arg;
   printf("New Car Thread Created with fd %d\n", client.fd);
 
@@ -38,13 +39,18 @@ void *handle_client(void *arg)
     }
 
     sleep(1);
-    if (send_message(client.fd, "FLOOR 5") == -1)
+    if (!sent) /* REMOVE THIS LATER */
     {
-      printf("Error sending floor request\n");
-    }
-    else
-    {
-      printf("Sent floor request\n");
+      if (send_message(client.fd, "FLOOR 5") == -1)
+      {
+        printf("Error sending floor request\n");
+      }
+      else
+      {
+        printf("Sent floor request\n");
+      }
+
+      sent = 1;
     }
   }
   printf("Thread ending\n");

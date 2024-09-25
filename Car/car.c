@@ -104,7 +104,9 @@ void *control_system_send_handler(void *arg)
   while (1)
   {
     char status_data[64];
+    pthread_mutex_lock(&data->status->mutex);
     snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", data->status->status, data->status->current_floor, data->status->destination_floor);
+    pthread_mutex_unlock(&data->status->mutex);
     while (1) // constantly loop trying to send the data
     {
       if (send_message(data->socketFd, (char *)status_data) != -1)

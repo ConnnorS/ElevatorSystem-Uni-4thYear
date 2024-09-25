@@ -105,23 +105,57 @@ void floor_int_to_char(int floor, char *floorChar)
   }
 }
 
+void opening_doors(connect_data_t *data)
+{
+  pthread_mutex_lock(&data->status->mutex);
+  strcpy(data->status->status, "Opening");
+  pthread_mutex_unlock(&data->status->mutex);
+}
+
+void open_doors(connect_data_t *data)
+{
+  pthread_mutex_lock(&data->status->mutex);
+  strcpy(data->status->status, "Open");
+  pthread_mutex_unlock(&data->status->mutex);
+}
+
+void update_current_floor(connect_data_t *data, int current_floor)
+{
+  pthread_mutex_lock(&data->status->mutex);
+  floor_int_to_char(current_floor, data->status->current_floor);
+  printf("We're now at floor %s\n", data->status->current_floor);
+  pthread_mutex_unlock(&data->status->mutex);
+}
+
+void update_destination_floor(connect_data_t *data, char *destination_floor)
+{
+  pthread_mutex_lock(&data->status->mutex);
+  strcpy(data->status->destination_floor, destination_floor);
+  pthread_mutex_unlock(&data->status->mutex);
+}
+
 void change_floor(connect_data_t *data, char *destination_floor)
 {
-
-  printf("Going to floor %s\n", destination_floor);
+  update_destination_floor(data, destination_floor);
 
   int destination_floor_int = floor_char_to_int(destination_floor);
-  int current_floor_int = 0;
+  pthread_mutex_lock(&data->status->mutex);
+  int current_floor_int = floor_char_to_int(data->status->current_floor);
+  pthread_mutex_unlock(&data->status->mutex);
 
-  while (current_floor_int != destination_floor_int)
+  printf("Moving floors: %d -> %d\n", current_floor_int, destination_floor_int);
+
+  while (1)
   {
-    printf("Changing floor\n");
-    // first grab the car's current floor and convert it to an integer
-    pthread_mutex_lock(&data->status->mutex);
-    current_floor_int = floor_char_to_int(data->status->current_floor);
-    pthread_mutex_unlock(&data->status->mutex);
+    if (current_floor_int == destination_floor_int)
+    {
+      opening_doors(data);
+      sleep(data->info->delay_ms / 1000);
+      open_doors(data);
 
-    /* then change the floor up or down by 1 */
+      return;
+    }
+    /* change the floor up or down by 1 */
     /* and if the floor is zero we'll need to change it */
     if (current_floor_int < destination_floor_int)
     {
@@ -141,9 +175,9 @@ void change_floor(connect_data_t *data, char *destination_floor)
     }
 
     /* now update the current floor */
-    pthread_mutex_lock(&data->status->mutex);
-    floor_int_to_char(current_floor_int, data->status->current_floor);
-    printf("We're now at floor %s\n", data->status->current_floor);
-    pthread_mutex_unlock(&data->status->mutex);
+    update_current_floor(data, current_floor_int);
+
+    /* and now delay until the next step */
+    sleep(data->info->delay_ms / 1000);
   }
 }
