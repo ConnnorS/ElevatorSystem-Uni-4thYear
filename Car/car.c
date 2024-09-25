@@ -12,7 +12,7 @@
 #include <arpa/inet.h>
 // my functions
 #include "car_helpers.h"
-#include "car_networks.h"
+#include "../common_networks.h"
 
 typedef struct connect_data
 {
@@ -20,6 +20,37 @@ typedef struct connect_data
   car_info *info;
   car_shared_mem *status;
 } connect_data_t;
+
+int connect_to_control_system()
+{
+  // create the address
+  struct sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
+  if (inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr) == -1)
+  {
+    perror("inet_pton()");
+    return -1;
+  }
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(3000);
+
+  // create the socket
+  int socketFd = socket(AF_INET, SOCK_STREAM, 0);
+  if (socketFd == -1)
+  {
+    perror("socket()");
+    return -1;
+  }
+
+  // connect to the server
+  if (connect(socketFd, (const struct sockaddr *)&addr, sizeof(addr)) == -1)
+  {
+    perror("connect()");
+    return -1;
+  }
+
+  return socketFd;
+}
 
 /* calls the connect_to_control_system function pointer */
 /* handles the connection to the control system */
@@ -41,7 +72,7 @@ void *control_system_connection_handler(void *arg)
   snprintf(car_data, sizeof(car_data), "CAR %s %s %s", data->info->name, data->info->lowest_floor, data->info->highest_floor);
   while (1)
   {
-    if (sendMessage(data->socketFd, (char *)car_data) != -1)
+    if (send_message(data->socketFd, (char *)car_data) != -1)
       break;
     sleep(data->info->delay_ms / 1000);
   }
@@ -54,13 +85,13 @@ void *control_system_connection_handler(void *arg)
     snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", data->status->status, data->status->current_floor, data->status->destination_floor);
     while (1) // constantly loop trying to send the data
     {
-      if (sendMessage(data->socketFd, (char *)status_data) != -1)
+      if (send_message(data->socketFd, (char *)status_data) != -1)
         break;
       sleep(data->info->delay_ms / 1000);
     }
     printf("Successful status message send\n");
 
-    char *floor = receive_floor(data->socketFd);
+    char *floor = receive_message(data->socketFd);
     printf("Received floor message: %s\n", floor);
 
     sleep(data->info->delay_ms / 1000);
