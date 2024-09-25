@@ -35,6 +35,16 @@ void *handle_client(void *arg)
       handle_received_status_message(&client, message);
       printf("Received status message: %s\n", message);
     }
+
+    sleep(1);
+    if (send_floor_request(client.fd, "FLOOR 5") == -1)
+    {
+      printf("Error sending floor request\n");
+    }
+    else
+    {
+      printf("Sent floor request\n");
+    }
   }
   printf("Thread ending\n");
   return NULL;

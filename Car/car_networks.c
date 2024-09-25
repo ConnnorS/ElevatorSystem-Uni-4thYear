@@ -54,3 +54,28 @@ int sendMessage(int socketFd, const char *message)
   }
   return 0;
 }
+
+char *receive_floor(int serverFd)
+{
+  char *message;
+  int length;
+
+  if (recv(serverFd, &length, sizeof(length), 0) != sizeof(length))
+  {
+    fprintf(stderr, "recv got invalid length value\n");
+    return NULL;
+  }
+
+  length = ntohl(length);
+  message = malloc(length + 1);
+  int received_length = recv(serverFd, message, length, 0);
+  if (received_length != length)
+  {
+    fprintf(stderr, "recv got invalid legnth message\nExpected: %d got %d\n", length, received_length);
+    return NULL;
+  }
+
+  message[length] = '\0';
+
+  return message;
+}

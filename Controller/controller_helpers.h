@@ -26,3 +26,4 @@ int create_server();
 char *receive_message(int fd);
 void handle_received_status_message(client_t *client, char *message);
 void handle_received_car_message(client_t *client, char *message);
+int send_floor_request(int clientFd, const char *message);

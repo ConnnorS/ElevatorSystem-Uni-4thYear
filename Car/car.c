@@ -60,6 +60,9 @@ void *control_system_connection_handler(void *arg)
     }
     printf("Successful status message send\n");
 
+    char *floor = receive_floor(data->socketFd);
+    printf("Received floor message: %s\n", floor);
+
     sleep(data->info->delay_ms / 1000);
   }
 
