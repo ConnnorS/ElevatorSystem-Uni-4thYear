@@ -83,3 +83,8 @@ void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor
   shm_status_ptr->individual_service_mode = 0;
   shm_status_ptr->emergency_mode = 0;
 }
+
+void change_floor(car_shared_mem *shm_status_ptr, const char *floor)
+{
+  printf("Going to floor %s\n", floor);
+}

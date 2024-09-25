@@ -52,9 +52,34 @@ int connect_to_control_system()
   return socketFd;
 }
 
+void *control_system_receive_handler(void *arg)
+{
+  connect_data_t *data;
+  data = arg;
+
+  while (1)
+  {
+    char *message = receive_message(data->socketFd);
+    if (message == NULL)
+    {
+      break;
+    }
+    else if (strncmp(message, "FLOOR", 5) == 0)
+    {
+      char floor_num[8];
+      sscanf(message, "%*s %s", floor_num);
+      change_floor(data->status, floor_num);
+    }
+    printf("Received message: %s\n", message);
+  }
+
+  printf("Receive handler thread ending\n");
+  return NULL;
+}
+
 /* calls the connect_to_control_system function pointer */
 /* handles the connection to the control system */
-void *control_system_connection_handler(void *arg)
+void *control_system_send_handler(void *arg)
 {
   /* connect to the control system */
   connect_data_t *data;
@@ -66,6 +91,10 @@ void *control_system_connection_handler(void *arg)
     sleep(data->info->delay_ms / 1000); // if failed, retry after specified delay
   }
   printf("Connection successful\n");
+
+  /* upon successful connection, spin up another thread to handle receiving messages */
+  pthread_t controller_receive_thread;
+  pthread_create(&controller_receive_thread, NULL, control_system_receive_handler, data);
 
   /* send the initial car identication data upon first connect*/
   char car_data[64];
@@ -90,9 +119,6 @@ void *control_system_connection_handler(void *arg)
       sleep(data->info->delay_ms / 1000);
     }
     printf("Successful status message send\n");
-
-    char *floor = receive_message(data->socketFd);
-    printf("Received floor message: %s\n", floor);
 
     sleep(data->info->delay_ms / 1000);
   }
@@ -156,8 +182,8 @@ int main(int argc, char **argv)
   connect.info = car;
   connect.status = shm_status_ptr;
   // run all this on a seprate thread
-  pthread_t controller_connection_thread;
-  pthread_create(&controller_connection_thread, NULL, control_system_connection_handler, &connect);
+  pthread_t controller_send_thread;
+  pthread_create(&controller_send_thread, NULL, control_system_send_handler, &connect);
 
   // for testing
   while (1)

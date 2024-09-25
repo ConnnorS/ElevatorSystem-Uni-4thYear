@@ -31,3 +31,4 @@ void compare_highest_lowest(int lowest, int highest);
 int do_shm_open(char *shm_status_name);
 void do_ftruncate(int fd, int size);
 void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor_char);
+void change_floor(car_shared_mem *shm_status_ptr, const char *floor);
