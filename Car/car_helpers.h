@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #define CAR_NAME_LENGTH 32
 
 typedef struct

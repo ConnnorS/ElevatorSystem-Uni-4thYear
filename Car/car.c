@@ -12,7 +12,7 @@
 #include <arpa/inet.h>
 // my functions
 #include "car_helpers.h"
-#include "car_networks.h"
+#include "../common_networks.h"
 
 typedef struct connect_data
 {
@@ -21,7 +21,40 @@ typedef struct connect_data
   car_shared_mem *status;
 } connect_data_t;
 
-void *do_connect_to_control_system(void *arg)
+int connect_to_control_system()
+{
+  // create the address
+  struct sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
+  if (inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr) == -1)
+  {
+    perror("inet_pton()");
+    return -1;
+  }
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(3000);
+
+  // create the socket
+  int socketFd = socket(AF_INET, SOCK_STREAM, 0);
+  if (socketFd == -1)
+  {
+    perror("socket()");
+    return -1;
+  }
+
+  // connect to the server
+  if (connect(socketFd, (const struct sockaddr *)&addr, sizeof(addr)) == -1)
+  {
+    perror("connect()");
+    return -1;
+  }
+
+  return socketFd;
+}
+
+/* calls the connect_to_control_system function pointer */
+/* handles the connection to the control system */
+void *control_system_connection_handler(void *arg)
 {
   /* connect to the control system */
   connect_data_t *data;
@@ -30,31 +63,39 @@ void *do_connect_to_control_system(void *arg)
   while (data->socketFd == -1)
   {
     data->socketFd = connect_to_control_system();
-    sleep(data->info->delay_ms / 1000);
+    sleep(data->info->delay_ms / 1000); // if failed, retry after specified delay
   }
   printf("Connection successful\n");
 
-  /* send the initial car identication data */
-  char car_data[32];
+  /* send the initial car identication data upon first connect*/
+  char car_data[64];
   snprintf(car_data, sizeof(car_data), "CAR %s %s %s", data->info->name, data->info->lowest_floor, data->info->highest_floor);
   while (1)
   {
-    if (sendMessage(data->socketFd, (char *)car_data) != -1)
+    if (send_message(data->socketFd, (char *)car_data) != -1)
       break;
     sleep(data->info->delay_ms / 1000);
   }
   printf("Successful identification message send\n");
 
-  /* send the car status data */
-  char status_data[32];
-  snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", data->status->status, data->status->current_floor, data->status->destination_floor);
+  /* constantly loop sending the status of the car every delay */
   while (1)
   {
-    if (sendMessage(data->socketFd, (char *)status_data) != -1)
-      break;
+    char status_data[64];
+    snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", data->status->status, data->status->current_floor, data->status->destination_floor);
+    while (1) // constantly loop trying to send the data
+    {
+      if (send_message(data->socketFd, (char *)status_data) != -1)
+        break;
+      sleep(data->info->delay_ms / 1000);
+    }
+    printf("Successful status message send\n");
+
+    char *floor = receive_message(data->socketFd);
+    printf("Received floor message: %s\n", floor);
+
     sleep(data->info->delay_ms / 1000);
   }
-  printf("Successful status message send\n");
 
   return NULL;
 }
@@ -116,7 +157,7 @@ int main(int argc, char **argv)
   connect.status = shm_status_ptr;
   // run all this on a seprate thread
   pthread_t controller_connection_thread;
-  pthread_create(&controller_connection_thread, NULL, do_connect_to_control_system, &connect);
+  pthread_create(&controller_connection_thread, NULL, control_system_connection_handler, &connect);
 
   // for testing
   while (1)
