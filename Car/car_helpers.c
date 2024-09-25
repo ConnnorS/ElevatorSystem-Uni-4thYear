@@ -123,7 +123,6 @@ void update_current_floor(connect_data_t *data, int current_floor)
 {
   pthread_mutex_lock(&data->status->mutex);
   floor_int_to_char(current_floor, data->status->current_floor);
-  printf("We're now at floor %s\n", data->status->current_floor);
   pthread_mutex_unlock(&data->status->mutex);
 }
 
@@ -152,32 +151,39 @@ void change_floor(connect_data_t *data, char *destination_floor)
       opening_doors(data);
       sleep(data->info->delay_ms / 1000);
       open_doors(data);
-
       return;
     }
-    /* change the floor up or down by 1 */
-    /* and if the floor is zero we'll need to change it */
+
+    /* Change the floor up or down by 1 */
+    /* And if the previous current floor is -1 or 1, we will make the next
+    current floor 1 or -1 (skipping over 0)*/
     if (current_floor_int < destination_floor_int)
     {
-      if (current_floor_int == 0)
+      if (current_floor_int == -1)
       {
         current_floor_int = 1;
       }
-      current_floor_int++;
+      else
+      {
+        current_floor_int++;
+      }
     }
     else
     {
-      if (current_floor_int == 0)
+      if (current_floor_int == 1)
       {
         current_floor_int = -1;
       }
-      current_floor_int--;
+      else
+      {
+        current_floor_int--;
+      }
     }
 
     /* now update the current floor */
     update_current_floor(data, current_floor_int);
 
-    /* and now delay until the next step */
+    /* And now delay until the next step */
     sleep(data->info->delay_ms / 1000);
   }
 }

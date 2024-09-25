@@ -14,6 +14,8 @@
 #include "car_helpers.h"
 #include "../common_networks.h"
 
+/* simple function to set up a TCP connection with the controller
+then return an int which is the socketFd */
 int connect_to_control_system()
 {
   // create the address
@@ -45,6 +47,8 @@ int connect_to_control_system()
   return socketFd;
 }
 
+/* this runs in it's own thread, receiving any messages from
+the controller and acting accordingly */
 void *control_system_receive_handler(void *arg)
 {
   connect_data_t *data;
@@ -53,7 +57,7 @@ void *control_system_receive_handler(void *arg)
   while (1)
   {
     char *message = receive_message(data->socketFd);
-    printf("Received message: %s\n", message);
+    printf("Received message from controller: %s\n", message);
     if (message == NULL)
     {
       break;
@@ -98,7 +102,6 @@ void *control_system_send_handler(void *arg)
       break;
     sleep(data->info->delay_ms / 1000);
   }
-  printf("Successful identification message send\n");
 
   /* constantly loop sending the status of the car every delay */
   while (1)
@@ -113,7 +116,6 @@ void *control_system_send_handler(void *arg)
         break;
       sleep(data->info->delay_ms / 1000);
     }
-    printf("Successful status message send\n");
 
     sleep(data->info->delay_ms / 1000);
   }
