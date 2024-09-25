@@ -14,13 +14,6 @@
 #include "car_helpers.h"
 #include "../common_networks.h"
 
-typedef struct connect_data
-{
-  int socketFd;
-  car_info *info;
-  car_shared_mem *status;
-} connect_data_t;
-
 int connect_to_control_system()
 {
   // create the address
@@ -60,17 +53,17 @@ void *control_system_receive_handler(void *arg)
   while (1)
   {
     char *message = receive_message(data->socketFd);
+    printf("Received message: %s\n", message);
     if (message == NULL)
     {
       break;
     }
     else if (strncmp(message, "FLOOR", 5) == 0)
     {
-      char floor_num[8];
+      char floor_num[4];
       sscanf(message, "%*s %s", floor_num);
-      change_floor(data->status, floor_num);
+      change_floor(data, floor_num);
     }
-    printf("Received message: %s\n", message);
   }
 
   printf("Receive handler thread ending\n");

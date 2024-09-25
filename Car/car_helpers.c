@@ -84,7 +84,66 @@ void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor
   shm_status_ptr->emergency_mode = 0;
 }
 
-void change_floor(car_shared_mem *shm_status_ptr, const char *floor)
+int floor_char_to_int(char *floor)
 {
-  printf("Going to floor %s\n", floor);
+  if (floor[0] == 'B')
+  {
+    floor[0] = '-';
+  }
+  return atoi(floor);
+}
+
+void floor_int_to_char(int floor, char *floorChar)
+{
+  if (floor < 0)
+  {
+    sprintf(floorChar, "B%d", abs(floor));
+  }
+  else
+  {
+    sprintf(floorChar, "%d", floor);
+  }
+}
+
+void change_floor(connect_data_t *data, char *destination_floor)
+{
+
+  printf("Going to floor %s\n", destination_floor);
+
+  int destination_floor_int = floor_char_to_int(destination_floor);
+  int current_floor_int = 0;
+
+  while (current_floor_int != destination_floor_int)
+  {
+    printf("Changing floor\n");
+    // first grab the car's current floor and convert it to an integer
+    pthread_mutex_lock(&data->status->mutex);
+    current_floor_int = floor_char_to_int(data->status->current_floor);
+    pthread_mutex_unlock(&data->status->mutex);
+
+    /* then change the floor up or down by 1 */
+    /* and if the floor is zero we'll need to change it */
+    if (current_floor_int < destination_floor_int)
+    {
+      if (current_floor_int == 0)
+      {
+        current_floor_int = 1;
+      }
+      current_floor_int++;
+    }
+    else
+    {
+      if (current_floor_int == 0)
+      {
+        current_floor_int = -1;
+      }
+      current_floor_int--;
+    }
+
+    /* now update the current floor */
+    pthread_mutex_lock(&data->status->mutex);
+    floor_int_to_char(current_floor_int, data->status->current_floor);
+    printf("We're now at floor %s\n", data->status->current_floor);
+    pthread_mutex_unlock(&data->status->mutex);
+  }
 }

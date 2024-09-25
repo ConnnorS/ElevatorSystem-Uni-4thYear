@@ -26,9 +26,16 @@ typedef struct
   int delay_ms;
 } car_info;
 
+typedef struct connect_data
+{
+  int socketFd;
+  car_info *info;
+  car_shared_mem *status;
+} connect_data_t;
+
 void validate_floor_range(int floor);
 void compare_highest_lowest(int lowest, int highest);
 int do_shm_open(char *shm_status_name);
 void do_ftruncate(int fd, int size);
 void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor_char);
-void change_floor(car_shared_mem *shm_status_ptr, const char *floor);
+void change_floor(connect_data_t *data, char *floor);
