@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 // my functions
 #include "controller_helpers.h"
+#include "../common_networks.h"
 
 void *handle_client(void *arg)
 {
@@ -37,7 +38,7 @@ void *handle_client(void *arg)
     }
 
     sleep(1);
-    if (send_floor_request(client.fd, "FLOOR 5") == -1)
+    if (send_message(client.fd, "FLOOR 5") == -1)
     {
       printf("Error sending floor request\n");
     }

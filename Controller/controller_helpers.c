@@ -48,31 +48,6 @@ int create_server()
   return serverFd;
 }
 
-char *receive_message(int fd)
-{
-  char *message;
-  int length;
-
-  if (recv(fd, &length, sizeof(length), 0) != sizeof(length))
-  {
-    fprintf(stderr, "recv got invalid length value\n");
-    return NULL;
-  }
-
-  length = ntohl(length);
-  message = malloc(length + 1);
-  int received_length = recv(fd, message, length, 0);
-  if (received_length != length)
-  {
-    fprintf(stderr, "recv got invalid legnth message\nExpected: %d got %d\n", length, received_length);
-    return NULL;
-  }
-
-  message[length] = '\0';
-
-  return message;
-}
-
 void handle_received_car_message(client_t *client, char *message)
 {
   char type[4];
@@ -92,17 +67,4 @@ void handle_received_status_message(client_t *client, char *message)
   char current_floor[4];
   char destination_floor[4];
   sscanf(message, "%6s %7s %3s %3s", message_type, status, current_floor, destination_floor);
-}
-
-int send_floor_request(int clientFd, const char *message)
-{
-  int message_length = strlen(message);
-  int network_length = htonl(message_length);
-  send(clientFd, &network_length, sizeof(network_length), 0);
-  if (send(clientFd, message, message_length, 0) != message_length)
-  {
-    printf("Send did not send all data\n");
-    return -1;
-  }
-  return 0;
 }
