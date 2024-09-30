@@ -40,8 +40,10 @@ void *handle_client(void *arg)
     }
     else if (strncmp(message, "CALL", 4) == 0)
     {
-      handle_received_call_message(message);
+      call_msg_info call_msg;
+      handle_received_call_message(message, &call_msg);
       printf("Received call message: %s\n", message);
+      printf("Source %d dest %d\n", call_msg.source_floor, call_msg.destination_floor);
     }
   }
   printf("Thread ending - car disconnected\n");

@@ -25,7 +25,15 @@ typedef struct
   char highest_floor[4];
 } client_t;
 
+/* structure which the handle_received_call_message() returns
+so the calling function can work out which car to call */
+typedef struct
+{
+  int source_floor;
+  int destination_floor;
+} call_msg_info;
+
 int create_server();
 void handle_received_status_message(client_t *client, char *message);
 void handle_received_car_message(client_t *client, char *message);
-void handle_received_call_message(char *message);
+void handle_received_call_message(char *message, call_msg_info *call_msg);

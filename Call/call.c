@@ -31,7 +31,9 @@ int main(int argc, char **argv)
   strcpy(destination_floor, argv[2]);
 
   /* connect to the control system */
+  printf("Attempting to connect to control system...\n");
   int serverFd = connect_to_control_system();
+  printf("Connection successful\n");
 
   /* prepare and send the message */
   char message[64];

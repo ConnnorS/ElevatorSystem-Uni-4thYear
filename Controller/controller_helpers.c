@@ -12,7 +12,7 @@
 #include <arpa/inet.h>
 // my functions
 #include "controller_helpers.h"
-#include "../Car/car_helpers.h" // for the floor int char conversion functions
+#include "../common_helpers.h"
 
 int create_server()
 {
@@ -72,9 +72,12 @@ void handle_received_status_message(client_t *client, char *message)
 
 /* this will extract the data and check if any car can service
 the request */
-void handle_received_call_message(char *message)
+void handle_received_call_message(char *message, call_msg_info *call_msg)
 {
   char source_floor[4];
   char destination_floor[4];
   sscanf(message, "%*s %3s %3s", source_floor, destination_floor);
+
+  call_msg->source_floor = floor_char_to_int(source_floor);
+  call_msg->destination_floor = floor_char_to_int(destination_floor);
 }
