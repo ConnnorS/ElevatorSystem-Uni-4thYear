@@ -15,6 +15,9 @@ typedef struct
   char highest_floor[4];
 } controller_car_info;
 
+/* data structure which keeps track of each client's fd
+and the floors they service. This will help when deciding
+which car to give floors to */
 typedef struct
 {
   int fd;

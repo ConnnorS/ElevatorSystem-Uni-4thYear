@@ -14,6 +14,8 @@
 #include "controller_helpers.h"
 #include "../common_networks.h"
 
+/* for n number of connected clients there will be
+n number of threads running this function */
 void *handle_client(void *arg)
 {
   client_t client = *(client_t *)arg;
@@ -57,6 +59,7 @@ int main(void)
     new_socket = accept(serverFd, (struct sockaddr *)&clientaddr, &clientaddr_len);
     if (new_socket >= 0)
     {
+      /* create a new thread to handle each new client */
       clients = realloc(clients, (client_count + 1) * sizeof(client_t));
       clients[client_count].fd = new_socket;
       pthread_t new_client_thread;
