@@ -19,7 +19,7 @@ n number of threads running this function */
 void *handle_client(void *arg)
 {
   client_t client = *(client_t *)arg;
-  printf("New Car Thread Created with fd %d\n", client.fd);
+  printf("New Client Handler Thread Created with fd %d\n", client.fd);
 
   while (1)
   {
@@ -41,6 +41,7 @@ void *handle_client(void *arg)
     else if (strncmp(message, "CALL", 4) == 0)
     {
       handle_received_call_message(message);
+      printf("Received call message: %s\n", message);
     }
   }
   printf("Thread ending - car disconnected\n");

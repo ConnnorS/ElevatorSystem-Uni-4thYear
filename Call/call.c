@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 // my functions
 #include "../common_networks.h"
+#include "../common_helpers.h"
 
 /* expect CL-arguments
 {source floor} {destination floor} */

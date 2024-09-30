@@ -11,6 +11,7 @@
 // my functions
 #include "car_helpers.h"
 #include "car_status_operations.h"
+#include "../common_helpers.h"
 
 void validate_floor_range(int floor)
 {
@@ -83,27 +84,6 @@ void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor
   shm_status_ptr->emergency_stop = 0;
   shm_status_ptr->individual_service_mode = 0;
   shm_status_ptr->emergency_mode = 0;
-}
-
-int floor_char_to_int(char *floor)
-{
-  if (floor[0] == 'B')
-  {
-    floor[0] = '-';
-  }
-  return atoi(floor);
-}
-
-void floor_int_to_char(int floor, char *floorChar)
-{
-  if (floor < 0)
-  {
-    sprintf(floorChar, "B%d", abs(floor));
-  }
-  else
-  {
-    sprintf(floorChar, "%d", floor);
-  }
 }
 
 void update_current_floor(connect_data_t *data, int current_floor)
