@@ -81,3 +81,18 @@ void handle_received_call_message(char *message, call_msg_info *call_msg)
   call_msg->source_floor = floor_char_to_int(source_floor);
   call_msg->destination_floor = floor_char_to_int(destination_floor);
 }
+
+void find_car_for_floor(call_msg_info *call_msg, client_t *clients, int client_count)
+{
+  for (int client_index = 0; client_index < client_count; client_index++)
+  {
+    if (strcmp(clients[client_index].highest_floor, "") == 0 || strcmp(clients[client_index].lowest_floor, "") == 0)
+    {
+      printf("We have not a car\n");
+    }
+    else
+    {
+      printf("We have a car\n");
+    }
+  }
+}

@@ -38,14 +38,10 @@ int main(int argc, char **argv)
   /* prepare and send the message */
   char message[64];
   snprintf(message, sizeof(message), "CALL %s %s", source_floor, destination_floor);
+  printf("Sending request from floor %s to floor %s\n", source_floor, destination_floor);
   send_message(serverFd, message);
 
   /* await a response */
-
-  while (1)
-    ;
-
-  printf("%s", message);
 
   return 0;
 }

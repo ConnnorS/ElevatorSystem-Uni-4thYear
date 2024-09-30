@@ -37,3 +37,4 @@ int create_server();
 void handle_received_status_message(client_t *client, char *message);
 void handle_received_car_message(client_t *client, char *message);
 void handle_received_call_message(char *message, call_msg_info *call_msg);
+void find_car_for_floor(call_msg_info *call_msg, client_t *clients, int client_count);
