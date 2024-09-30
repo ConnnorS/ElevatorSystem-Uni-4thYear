@@ -16,7 +16,6 @@
 
 void *handle_client(void *arg)
 {
-  int sent = 0;
   client_t client = *(client_t *)arg;
   printf("New Car Thread Created with fd %d\n", client.fd);
 
@@ -36,20 +35,6 @@ void *handle_client(void *arg)
     {
       handle_received_status_message(&client, message);
       printf("Received status message: %s\n", message);
-    }
-
-    if (!sent) /* REMOVE THIS LATER */
-    {
-      if (send_message(client.fd, "FLOOR B9") == -1)
-      {
-        printf("Error sending floor request\n");
-      }
-      else
-      {
-        printf("Sent floor request\n");
-      }
-
-      sent = 1;
     }
   }
   printf("Thread ending - car disconnected\n");
