@@ -48,6 +48,8 @@ int create_server()
   return serverFd;
 }
 
+/* handles a received message that starts with "CAR", extract's
+the car's data and saves it in the car's client_t data structure */
 void handle_received_car_message(client_t *client, char *message)
 {
   char name[32];
@@ -58,11 +60,22 @@ void handle_received_car_message(client_t *client, char *message)
   strcpy(client->lowest_floor, lowest_floor);
 }
 
+/* this does nothing yet except for extact data */
 void handle_received_status_message(client_t *client, char *message)
 {
-  // extract all the data from the message
   char status[8];
   char current_floor[4];
   char destination_floor[4];
   sscanf(message, "%*s %7s %3s %3s", status, current_floor, destination_floor);
+}
+
+/* this will extract the data and check if any car can service
+the request */
+void handle_received_call_message(char *message)
+{
+  char source_floor[4];
+  char destination_floor[4];
+  sscanf(message, "%*s %3s %3s", source_floor, destination_floor);
+
+  printf("Call is from %s and is going to %s\n", source_floor, destination_floor);
 }

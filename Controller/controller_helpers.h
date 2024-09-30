@@ -28,3 +28,4 @@ typedef struct
 int create_server();
 void handle_received_status_message(client_t *client, char *message);
 void handle_received_car_message(client_t *client, char *message);
+void handle_received_call_message(char *message);

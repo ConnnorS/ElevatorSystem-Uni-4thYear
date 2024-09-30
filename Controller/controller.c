@@ -38,6 +38,10 @@ void *handle_client(void *arg)
       handle_received_status_message(&client, message);
       printf("Received status message: %s\n", message);
     }
+    else if (strncmp(message, "CALL", 4) == 0)
+    {
+      handle_received_call_message(message);
+    }
   }
   printf("Thread ending - car disconnected\n");
   return NULL;

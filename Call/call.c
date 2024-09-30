@@ -34,11 +34,11 @@ int main(int argc, char **argv)
 
   /* prepare and send the message */
   char message[64];
-  snprintf(message, sizeof(message), "CAR %s %s", source_floor, destination_floor);
+  snprintf(message, sizeof(message), "CALL %s %s", source_floor, destination_floor);
   send_message(serverFd, message);
 
   /* await a response */
-  
+
   while (1)
     ;
 
