@@ -33,7 +33,6 @@ typedef struct connect_data
   car_shared_mem *status;
 } connect_data_t;
 
-void validate_floor_range(int floor);
 void compare_highest_lowest(int lowest, int highest);
 int do_shm_open(char *shm_status_name);
 void do_ftruncate(int fd, int size);
