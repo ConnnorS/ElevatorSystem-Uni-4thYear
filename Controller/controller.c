@@ -19,6 +19,36 @@ client_info *clients;
 int client_count;
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+/* reallocs memory and removes the disconnected client from
+the clients array */
+void remove_client(int fd)
+{
+  pthread_mutex_lock(&clients_mutex);
+
+  int index = -1;
+  for (int i = 0; i < client_count; i++)
+  {
+    if (clients[i].fd == fd)
+    {
+      index = i;
+      break;
+    }
+  }
+
+  // shift clients to remove it from the array
+  if (index != -1)
+  {
+    for (int i = index; i < client_count - 1; i++)
+    {
+      clients[i] = clients[i + 1];
+    }
+    client_count--;
+    clients = realloc(clients, client_count * sizeof(client_info));
+  }
+
+  pthread_mutex_unlock(&clients_mutex);
+}
+
 /* for n number of connected clients there will be
 n number of threads running this function */
 void *handle_client(void *arg)
@@ -78,11 +108,13 @@ void *handle_client(void *arg)
     pthread_mutex_unlock(&clients_mutex);
   }
   printf("Thread ending - client disconnected\n");
+  remove_client(fd);
   return NULL;
 }
 
 int main(void)
 {
+  /* setup the clients array */
   pthread_mutex_lock(&clients_mutex);
   clients = malloc(0);
   client_count = 0;

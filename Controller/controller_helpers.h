@@ -9,6 +9,7 @@ typedef struct
   char name[CAR_NAME_LENGTH];
   char lowest_floor[4];
   char highest_floor[4];
+  int *queue;
 } client_info;
 
 /* structure which the handle_received_call_message() returns
