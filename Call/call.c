@@ -42,6 +42,14 @@ int main(int argc, char **argv)
   send_message(serverFd, message);
 
   /* await a response */
-
+  char *response = receive_message(serverFd);
+  if (strcmp(response, "UNAVAILABLE") == 0)
+  {
+    printf("Sorry, no car is available to take this request.\n");
+  }
+  else
+  {
+    printf("%s is arriving.\n", response);
+  }
   return 0;
 }
