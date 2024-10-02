@@ -15,7 +15,7 @@
 #include "../common_networks.h"
 
 /* global variables & mutex */
-client_t *clients;
+client_info *clients;
 int client_count;
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -24,7 +24,7 @@ n number of threads running this function */
 void *handle_client(void *arg)
 {
   pthread_mutex_lock(&clients_mutex);
-  client_t *client = (client_t *)arg;
+  client_info *client = (client_info *)arg;
   // save the fd to a local variable to avoid constant mutex locking and unlocking
   int fd = client->fd;
   pthread_mutex_unlock(&clients_mutex);
@@ -55,10 +55,25 @@ void *handle_client(void *arg)
       its lowest_floor and highest_floor values to nothing */
       strcpy(client->highest_floor, "");
       strcpy(client->lowest_floor, "");
+      strcpy(client->name, "");
+
       call_msg_info call_msg;
       handle_received_call_message(message, &call_msg);
       printf("Received call message: %s\n", message);
-      find_car_for_floor(&call_msg, clients, client_count);
+
+      char car_name[CAR_NAME_LENGTH]; // the name of the car to service the request
+      int car_fd = find_car_for_floor(&call_msg, clients, client_count, car_name);
+      if (car_fd == -1)
+      {
+        send_message(fd, "UNAVAILABLE");
+      }
+      else
+      {
+        char response[64];
+        snprintf(response, sizeof(response), "Car %s", car_name);
+        printf("Sending car %s\n", response);
+        send_message(fd, response);
+      }
     }
     pthread_mutex_unlock(&clients_mutex);
   }
@@ -85,11 +100,11 @@ int main(void)
     if (new_socket >= 0)
     {
       pthread_mutex_lock(&clients_mutex);
-      clients = realloc(clients, (client_count + 1) * sizeof(client_t));
+      clients = realloc(clients, (client_count + 1) * sizeof(client_info));
       clients[client_count].fd = new_socket;
       /* create a new thread to handle each new client */
-      pthread_t new_client_thread;
-      pthread_create(&new_client_thread, NULL, handle_client, (void *)&clients[client_count]);
+      pthread_t new_client_infohread;
+      pthread_create(&new_client_infohread, NULL, handle_client, (void *)&clients[client_count]);
 
       client_count++;
       pthread_mutex_unlock(&clients_mutex);
