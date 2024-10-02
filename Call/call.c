@@ -25,14 +25,30 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  char source_floor[4];
+  char source_floor[8];
   strcpy(source_floor, argv[1]);
-  char destination_floor[4];
+  char destination_floor[8];
   strcpy(destination_floor, argv[2]);
+
+  /* validate floor ranges */
+  int source_floor_int = floor_char_to_int(source_floor);
+  validate_floor_range(source_floor_int);
+  int destination_floor_int = floor_char_to_int(destination_floor);
+  validate_floor_range(destination_floor_int);
+  if (strcmp(source_floor, destination_floor) == 0)
+  {
+    printf("You are already on that floor!\n");
+    exit(1);
+  }
 
   /* connect to the control system */
   printf("Attempting to connect to control system...\n");
   int serverFd = connect_to_control_system();
+  if (serverFd == -1)
+  {
+    printf("Unable to connect to elevator system\n");
+    exit(1);
+  }
   printf("Connection successful\n");
 
   /* prepare and send the message */

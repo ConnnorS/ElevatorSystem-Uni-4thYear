@@ -13,25 +13,6 @@
 #include "car_status_operations.h"
 #include "../common_helpers.h"
 
-void validate_floor_range(int floor)
-{
-  if (floor < -99)
-  {
-    printf("Lowest floor or highest floor cannot be lower than B99\n");
-    exit(1);
-  }
-  else if (floor > 999)
-  {
-    printf("Lowest floor or highest floor cannot be higher than 999\n");
-    exit(1);
-  }
-  else if (floor == 0)
-  {
-    printf("Floor cannot be zero\n");
-    exit(1);
-  }
-}
-
 void compare_highest_lowest(int lowest, int highest)
 {
   if (highest < lowest)
