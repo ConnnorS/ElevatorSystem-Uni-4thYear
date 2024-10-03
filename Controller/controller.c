@@ -54,23 +54,29 @@ void remove_client(int fd)
 updates to the car's queue and send messages accordingly */
 void *client_queue_manager(void *arg)
 {
-  pthread_mutex_lock(&clients_mutex);
   client_info *client = (client_info *)arg;
+  pthread_mutex_lock(&client->mutex);
   int fd = client->fd;
   printf("New queue manager thread created for fd %d\n", fd);
-  pthread_cond_init(&client->queue_cond, NULL);
 
   while (1)
   {
-    pthread_cond_wait(&client->queue_cond, &clients_mutex);
-    printf("New queue element\n");
-    int next_floor = client->queue[0];
-    char floor_message[64];
-    snprintf(floor_message, sizeof(floor_message), "FLOOR %d", next_floor);
-    send_message(fd, floor_message);
-    remove_floor(client);
+    pthread_cond_wait(&client->queue_cond, &client->mutex);
+    if (client->queue_length > 0) // put in this check to avoid spontaneous wakeups
+    {
+      int next_floor = client->queue[0];
+      char floor_message[64];
+      snprintf(floor_message, sizeof(floor_message), "FLOOR %d", next_floor);
+      printf("Sending %s\n", floor_message);
+      send_message(fd, floor_message);
+      remove_floor(client);
+    }
+    else
+    {
+      printf("Queue empty\n");
+    }
   }
-  pthread_mutex_unlock(&clients_mutex);
+  pthread_mutex_unlock(&client->mutex);
 }
 
 /* for n number of connected clients there will be
@@ -78,9 +84,9 @@ n number of threads running this function */
 void *handle_client(void *arg)
 {
   /* initialise the client data */
-  pthread_mutex_lock(&clients_mutex);
   client_info *client = (client_info *)arg;
   // save the fd to a local variable to avoid constant mutex locking and unlocking
+  pthread_mutex_lock(&clients_mutex);
   int fd = client->fd;
   char name[CAR_NAME_LENGTH];
   client->queue = malloc(0);
@@ -96,7 +102,7 @@ void *handle_client(void *arg)
     {
       break;
     }
-    pthread_mutex_lock(&clients_mutex);
+    pthread_mutex_lock(&client->mutex);
     if (strncmp(message, "CAR", 3) == 0)
     {
       handle_received_car_message(client, message, name);
@@ -121,7 +127,7 @@ void *handle_client(void *arg)
       /* find a car to service the call */
       char chosen_car_name[CAR_NAME_LENGTH];
       int call_direction;
-      int car_fd = find_car_for_floor(&call_msg, clients, client_count, chosen_car_name, &call_direction);
+      int car_fd = find_car_for_floor(&call_msg, clients, &clients_mutex, client_count, chosen_car_name, &call_direction);
       /* send response to the call pad */
       if (car_fd == -1)
       {
@@ -143,7 +149,7 @@ void *handle_client(void *arg)
         }
       }
     }
-    pthread_mutex_unlock(&clients_mutex);
+    pthread_mutex_unlock(&client->mutex);
   }
   printf("Thread ending - client disconnected\n");
   remove_client(fd);
@@ -173,6 +179,7 @@ int main(void)
       clients = realloc(clients, (client_count + 1) * sizeof(client_info));
       clients[client_count].fd = new_socket;
       clients[client_count].direction = CAR_NEUTRAL;
+      pthread_cond_init(&clients[client_count].queue_cond, NULL);
       /* create a new thread to handle each new client */
       pthread_t new_client_infothread;
       pthread_create(&new_client_infothread, NULL, handle_client, (void *)&clients[client_count]);
