@@ -19,8 +19,6 @@ typedef struct
   char highest_floor[4];
   int *queue;                // the array of ints for the queue
   int queue_length;          // the length of the queue
-  pthread_cond_t queue_cond; // condition variable for watching the queue change
-  int direction;             // -1 for down, 1 for up, 0 for empty queue
 } client_info;
 
 /* structure which the handle_received_call_message() returns

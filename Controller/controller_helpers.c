@@ -86,15 +86,13 @@ void parse_received_call_message(char *message, call_msg_info *call_msg)
 /* returns the fd of the client which can service the given floors */
 int find_car_for_floor(call_msg_info *call_msg, client_info *clients, int client_count, char car_name[CAR_NAME_LENGTH], int *call_direction)
 {
-  *call_direction = call_msg->source_floor < call_msg->destination_floor ? CAR_UP : CAR_DOWN;
-
   int serviceable_lowest_floor_int;
   int serviceable_highest_floor_int;
   // loop through the array of clients to find one that can service the floors
   for (int index = 0; index < client_count; index++)
   {
     // ensure the client is a car and can serve the direction the call is going in
-    if (clients[index].type == IS_CAR && (clients[index].direction == *call_direction || clients[index].direction == CAR_NEUTRAL))
+    if (clients[index].type == IS_CAR)
     {
       serviceable_highest_floor_int = floor_char_to_int(clients[index].highest_floor);
       serviceable_lowest_floor_int = floor_char_to_int(clients[index].lowest_floor);
@@ -155,19 +153,21 @@ void remove_floor(client_info *client)
 
 void add_to_car_queue(client_info *client, call_msg_info *call_msg)
 {
+  /* allocate memory */
+  client->queue_length += 2;
+  client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
+
   // if the queue is empty, initialize it
   if (client->queue_length == 0)
   {
-    /* allocate memory */
-    client->queue_length += 2;
-    client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
-    /* determine the direction */
-    client->direction = call_msg->source_floor < call_msg->destination_floor ? CAR_UP : CAR_DOWN;
     client->queue[0] = call_msg->source_floor;
     client->queue[1] = call_msg->destination_floor;
   }
-  pthread_cond_signal(&client->queue_cond);
-
+  else
+  {
+    client->queue[client->queue_length - 2] = call_msg->source_floor;
+    client->queue[client->queue_length - 1] = call_msg->destination_floor;
+  }
   // Print the queue for testing
   print_queue(client);
 }
