@@ -165,12 +165,8 @@ void add_to_car_queue(client_info *client, call_msg_info *call_msg)
     client->direction = call_msg->source_floor < call_msg->destination_floor ? CAR_UP : CAR_DOWN;
     client->queue[0] = call_msg->source_floor;
     client->queue[1] = call_msg->destination_floor;
-    pthread_cond_signal(&client->queue_cond);
   }
-  else
-  {
-    pthread_cond_signal(&client->queue_cond);
-  }
+  pthread_cond_signal(&client->queue_cond);
 
   // Print the queue for testing
   print_queue(client);

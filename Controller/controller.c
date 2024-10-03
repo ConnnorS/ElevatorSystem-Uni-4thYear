@@ -10,6 +10,8 @@
 #include <unistd.h>
 // networks
 #include <arpa/inet.h>
+// signal handling
+#include <signal.h>
 // my functions
 #include "controller_helpers.h"
 #include "../common_networks.h"
@@ -50,6 +52,30 @@ void remove_client(int fd)
   pthread_mutex_unlock(&clients_mutex);
 }
 
+/* cleanup function to free allocated memory */
+void cleanup()
+{
+  pthread_mutex_lock(&clients_mutex);
+
+  for (int i = 0; i < client_count; i++)
+  {
+    free(clients[i].queue);                       // free each client's queue
+    pthread_cond_destroy(&clients[i].queue_cond); // destroy condition variable
+  }
+  free(clients); // free the clients array
+
+  pthread_mutex_unlock(&clients_mutex);
+  printf("Cleanup completed.\n");
+}
+
+/* Signal handler for cleanup */
+void signal_handler(int signum)
+{
+  printf("Received signal %d. Cleaning up...\n", signum);
+  cleanup();
+  exit(0); // Exit the program
+}
+
 /* spawned off from a handle_client thread to look for
 updates to the car's queue and send messages accordingly */
 void *client_queue_manager(void *arg)
@@ -61,16 +87,16 @@ void *client_queue_manager(void *arg)
   while (1)
   {
     pthread_mutex_lock(&clients_mutex);
-    while (client->queue_length <= 0)
+    while (client->queue_length == 0) // Wait until there's something in the queue
     {
       pthread_cond_wait(&client->queue_cond, &clients_mutex);
     }
-    printf("Sending message\n");
+
+    // Process the queue here
     char message[64];
     snprintf(message, sizeof(message), "FLOOR %d", client->queue[0]);
     send_message(fd, message);
     remove_floor(client);
-    // Process the queue here
     pthread_mutex_unlock(&clients_mutex);
   }
 }
@@ -96,8 +122,9 @@ void *handle_client(void *arg)
     char *message = receive_message(fd);
     if (message == NULL)
     {
-      break;
+      break; // Break if no message (client disconnected)
     }
+
     pthread_mutex_lock(&clients_mutex);
     if (strncmp(message, "CAR", 3) == 0)
     {
@@ -124,6 +151,7 @@ void *handle_client(void *arg)
       char chosen_car_name[CAR_NAME_LENGTH];
       int call_direction;
       int car_fd = find_car_for_floor(&call_msg, clients, client_count, chosen_car_name, &call_direction);
+
       /* send response to the call pad */
       if (car_fd == -1)
       {
@@ -134,12 +162,14 @@ void *handle_client(void *arg)
         char response[64];
         snprintf(response, sizeof(response), "Car %s", chosen_car_name);
         send_message(fd, response);
+
         /* add the floors to the chosen car's queue */
         for (int index = 0; index < client_count; index++)
         {
           if (strcmp(chosen_car_name, clients[index].name) == 0)
           {
             add_to_car_queue(&clients[index], &call_msg);
+            pthread_cond_signal(&clients[index].queue_cond); // Signal the queue manager thread
             break;
           }
         }
@@ -147,6 +177,7 @@ void *handle_client(void *arg)
     }
     pthread_mutex_unlock(&clients_mutex);
   }
+
   printf("Thread ending - client disconnected\n");
   remove_client(fd);
   return NULL;
@@ -154,6 +185,9 @@ void *handle_client(void *arg)
 
 int main(void)
 {
+  // Set up signal handler for SIGINT
+  signal(SIGINT, signal_handler);
+
   /* setup the clients array */
   pthread_mutex_lock(&clients_mutex);
   clients = malloc(0);
@@ -191,6 +225,7 @@ int main(void)
     }
   }
 
-  free(clients);
+  // Cleanup before program termination
+  cleanup();
   return 0;
 }
