@@ -50,6 +50,25 @@ void remove_client(int fd)
   pthread_mutex_unlock(&clients_mutex);
 }
 
+/* spawned off from a handle_client thread to look for
+updates to the car's queue and send messages accordingly */
+void *client_queue_manager(void *arg)
+{
+  pthread_mutex_lock(&clients_mutex);
+  client_info *client = (client_info *)arg;
+  int fd = client->fd;
+  printf("New queue manager thread created for fd %d\n", fd);
+  pthread_cond_init(&client->queue_cond, NULL);
+
+  while (1)
+  {
+    printf("Waiting for queue change from thread %d\n", fd);
+    pthread_cond_wait(&client->queue_cond, &clients_mutex);
+    
+  }
+  pthread_mutex_unlock(&clients_mutex);
+}
+
 /* for n number of connected clients there will be
 n number of threads running this function */
 void *handle_client(void *arg)
@@ -78,6 +97,10 @@ void *handle_client(void *arg)
     {
       handle_received_car_message(client, message, name);
       printf("New car: %s\n", message);
+
+      /* spin off the car's queue handler thread */
+      pthread_t client_queue_handler_thread;
+      pthread_create(&client_queue_handler_thread, NULL, client_queue_manager, (void *)client);
     }
     else if (strncmp(message, "STATUS", 6) == 0)
     {
@@ -93,7 +116,8 @@ void *handle_client(void *arg)
       printf("%s\n", message);
       /* find a car to service the call */
       char chosen_car_name[CAR_NAME_LENGTH];
-      int car_fd = find_car_for_floor(&call_msg, clients, client_count, chosen_car_name);
+      int call_direction;
+      int car_fd = find_car_for_floor(&call_msg, clients, client_count, chosen_car_name, &call_direction);
       /* send response to the call pad */
       if (car_fd == -1)
       {
@@ -135,7 +159,7 @@ int main(void)
 
   struct sockaddr clientaddr;
   socklen_t clientaddr_len;
-
+  /* create new threads for each connected client */
   while (1)
   {
     new_socket = accept(serverFd, (struct sockaddr *)&clientaddr, &clientaddr_len);
@@ -144,9 +168,10 @@ int main(void)
       pthread_mutex_lock(&clients_mutex);
       clients = realloc(clients, (client_count + 1) * sizeof(client_info));
       clients[client_count].fd = new_socket;
+      clients[client_count].direction = CAR_NEUTRAL;
       /* create a new thread to handle each new client */
-      pthread_t new_client_infohread;
-      pthread_create(&new_client_infohread, NULL, handle_client, (void *)&clients[client_count]);
+      pthread_t new_client_infothread;
+      pthread_create(&new_client_infothread, NULL, handle_client, (void *)&clients[client_count]);
 
       client_count++;
       pthread_mutex_unlock(&clients_mutex);
