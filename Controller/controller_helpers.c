@@ -84,9 +84,8 @@ void parse_received_call_message(char *message, call_msg_info *call_msg)
 }
 
 /* returns the fd of the client which can service the given floors */
-int find_car_for_floor(call_msg_info *call_msg, client_info *clients, pthread_mutex_t *clients_mutex, int client_count, char car_name[CAR_NAME_LENGTH], int *call_direction)
+int find_car_for_floor(call_msg_info *call_msg, client_info *clients, int client_count, char car_name[CAR_NAME_LENGTH], int *call_direction)
 {
-  pthread_mutex_lock(clients_mutex);
   *call_direction = call_msg->source_floor < call_msg->destination_floor ? CAR_UP : CAR_DOWN;
 
   int serviceable_lowest_floor_int;
@@ -109,7 +108,6 @@ int find_car_for_floor(call_msg_info *call_msg, client_info *clients, pthread_mu
       }
     }
   }
-  pthread_mutex_unlock(clients_mutex);
   // if no clients are found, return -1
   return -1;
 }
@@ -127,35 +125,28 @@ void print_queue(const client_info *client)
 /* removes the most recently called floor from the queue */
 void remove_floor(client_info *client)
 {
-  // Check if there are any floors to remove
   if (client->queue_length <= 0)
   {
-    return; // Nothing to remove
+    return;
   }
 
-  // Shift the elements to remove the first floor
   for (int index = 0; index < client->queue_length - 1; index++)
   {
     client->queue[index] = client->queue[index + 1];
   }
 
-  // Decrease the queue length
   client->queue_length--;
 
-  // Reallocate memory for the new queue size
   int *temp_queue = realloc(client->queue, sizeof(int) * client->queue_length);
   if (temp_queue == NULL && client->queue_length > 0)
   {
     perror("Realloc failed");
-    // Handle the error, but for now, we can leave the original queue intact.
-    // Optionally, you might want to log an error and exit the application.
     return;
   }
 
-  // Update the queue pointer if realloc was successful
   client->queue = temp_queue;
 
-  // If the queue length is now zero, set queue to NULL to avoid dangling pointers
+  // if the queue length is now zero, set queue to NULL to avoid dangling pointers
   if (client->queue_length == 0)
   {
     client->queue = NULL;
@@ -178,6 +169,7 @@ void add_to_car_queue(client_info *client, call_msg_info *call_msg)
   }
   else
   {
+    pthread_cond_signal(&client->queue_cond);
   }
 
   // Print the queue for testing

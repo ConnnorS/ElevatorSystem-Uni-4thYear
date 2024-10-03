@@ -11,10 +11,9 @@ and the floors they service. This will help when deciding
 which car to give floors to */
 typedef struct
 {
-  int fd;                // the file descriptor of the client for sending messages
-  pthread_mutex_t mutex; // specific mutex for each client to reduce global locks
-  int type;              // whether it's a car or callpad
-  char status[8];        // C string indicating the elevator's status
+  int fd;         // the file descriptor of the client for sending messages
+  int type;       // whether it's a car or callpad
+  char status[8]; // C string indicating the elevator's status
   char name[CAR_NAME_LENGTH];
   char lowest_floor[4];
   char highest_floor[4];
@@ -36,6 +35,6 @@ int create_server();
 void handle_received_status_message(client_info *client, char *message);
 void handle_received_car_message(client_info *client, char *message, char *name);
 void parse_received_call_message(char *message, call_msg_info *call_msg);
-int find_car_for_floor(call_msg_info *call_msg, client_info *clients, pthread_mutex_t *clients_mutex, int client_count, char car_name[CAR_NAME_LENGTH], int *call_direction);
+int find_car_for_floor(call_msg_info *call_msg, client_info *clients, int client_count, char car_name[CAR_NAME_LENGTH], int *call_direction);
 void add_to_car_queue(client_info *client, call_msg_info *call_msg);
 void remove_floor(client_info *client);
