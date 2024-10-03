@@ -13,6 +13,7 @@
 // my functions
 #include "car_helpers.h"
 #include "../common_networks.h"
+#include "../common_helpers.h"
 
 /* this runs in it's own thread, receiving any messages from
 the controller and acting accordingly */

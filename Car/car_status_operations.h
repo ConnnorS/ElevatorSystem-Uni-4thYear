@@ -1,3 +1,5 @@
+#include "car_helpers.h"
+
 void opening_doors(connect_data_t *data);
 void open_doors(connect_data_t *data);
 void closing_doors(connect_data_t *data);

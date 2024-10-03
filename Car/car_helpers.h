@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <car_status_operations.h>
 
 #define CAR_NAME_LENGTH 32
 
