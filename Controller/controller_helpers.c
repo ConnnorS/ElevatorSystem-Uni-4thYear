@@ -51,15 +51,15 @@ int create_server()
 
 /* handles a received message that starts with "CAR", extract's
 the car's data and saves it in the car's client_info data structure */
-void handle_received_car_message(client_info *client, char *message)
+void handle_received_car_message(client_info *client, char *message, char *name)
 {
-  char name[CAR_NAME_LENGTH];
   char lowest_floor[4];
   char highest_floor[4];
   sscanf(message, "%*s %31s %3s %3s", name, lowest_floor, highest_floor);
   strcpy(client->highest_floor, highest_floor);
   strcpy(client->lowest_floor, lowest_floor);
   strcpy(client->name, name);
+  client->type = IS_CAR;
 }
 
 /* this does nothing yet except for extact data */
@@ -72,7 +72,7 @@ void handle_received_status_message(client_info *client, char *message)
 }
 
 /* this will extract the call message and assign it to the call_msg */
-void handle_received_call_message(char *message, call_msg_info *call_msg)
+void parse_received_call_message(char *message, call_msg_info *call_msg)
 {
   char source_floor[4];
   char destination_floor[4];
@@ -89,13 +89,11 @@ int find_car_for_floor(call_msg_info *call_msg, client_info *clients, int client
   int serviceable_lowest_floor_int;
   int serviceable_highest_floor_int;
 
-  printf("Car called for floor %d to %d\n", call_msg->source_floor, call_msg->destination_floor);
-
   // loop through the array of clients to find one that can service the floors
   for (int index = 0; index < client_count; index++)
   {
-    // if the client's highest_floor and lowest_floor is empty - they're not a car so ignore them
-    if (strcmp(clients[index].highest_floor, "") != 0 && strcmp(clients[index].lowest_floor, "") != 0)
+    // ensure we're only dealing with a car
+    if (clients[index].type)
     {
       serviceable_highest_floor_int = floor_char_to_int(clients[index].highest_floor);
       serviceable_lowest_floor_int = floor_char_to_int(clients[index].lowest_floor);
@@ -109,6 +107,73 @@ int find_car_for_floor(call_msg_info *call_msg, client_info *clients, int client
       }
     }
   }
-
+  // if no clients are found, return -1
   return -1;
+}
+
+void print_queue(const client_info *client)
+{
+  printf("Current queue for %s: ", client->name);
+  for (int i = 0; i < client->queue_length; i++)
+  {
+    printf("%d ", client->queue[i]);
+  }
+  printf("\n");
+}
+
+void add_to_car_queue(client_info *client, call_msg_info *call_msg)
+{
+  // if the queue is empty, initialize it
+  if (client->queue_length == 0)
+  {
+    client->queue_length += 2;
+    client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
+    if (call_msg->source_floor < call_msg->destination_floor)
+    {
+      client->queue[0] = call_msg->source_floor;
+      client->queue[1] = call_msg->destination_floor;
+    }
+    else
+    {
+      client->queue[0] = call_msg->destination_floor;
+      client->queue[1] = call_msg->destination_floor;
+    }
+  }
+  else
+  {
+    int index = 0;
+    // add the source floor to the array
+    while (client->queue[index] < call_msg->source_floor)
+    {
+      index++;
+      if (index == client->queue_length)
+        break;
+    }
+    client->queue_length++;
+    client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
+    for (int end = client->queue_length - 1; end > index; end--)
+    {
+      client->queue[end] = client->queue[end - 1];
+    }
+    client->queue[index] = call_msg->source_floor;
+
+    // now add the destination floor
+    index = 0;
+    while (client->queue[index] < call_msg->destination_floor)
+    {
+      index++;
+      if (index == client->queue_length)
+        break;
+    }
+    client->queue_length++;
+    client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
+    for (int end = client->queue_length - 1; end > index; end--)
+    {
+      client->queue[end] = client->queue[end - 1];
+    }
+    client->queue[index] = call_msg->destination_floor;
+  }
+
+  // Print the queue for testing
+  print_queue(client);
 }

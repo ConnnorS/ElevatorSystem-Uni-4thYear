@@ -38,6 +38,7 @@ void remove_client(int fd)
   // shift clients to remove it from the array
   if (index != -1)
   {
+    free(clients[index].queue);
     for (int i = index; i < client_count - 1; i++)
     {
       clients[i] = clients[i + 1];
@@ -53,10 +54,14 @@ void remove_client(int fd)
 n number of threads running this function */
 void *handle_client(void *arg)
 {
+  /* initialise the client data */
   pthread_mutex_lock(&clients_mutex);
   client_info *client = (client_info *)arg;
   // save the fd to a local variable to avoid constant mutex locking and unlocking
   int fd = client->fd;
+  char name[CAR_NAME_LENGTH];
+  client->queue = malloc(0);
+  client->queue_length = 0;
   pthread_mutex_unlock(&clients_mutex);
 
   printf("New Client Handler Thread Created with fd %d\n", fd);
@@ -71,28 +76,25 @@ void *handle_client(void *arg)
     pthread_mutex_lock(&clients_mutex);
     if (strncmp(message, "CAR", 3) == 0)
     {
-      handle_received_car_message(client, message);
-      printf("Received car message: %s\n", message);
+      handle_received_car_message(client, message, name);
+      printf("New car: %s\n", message);
     }
     else if (strncmp(message, "STATUS", 6) == 0)
     {
       handle_received_status_message(client, message);
-      printf("Received status message: %s\n", message);
+      printf("%s %s\n", name, message);
     }
     else if (strncmp(message, "CALL", 4) == 0)
     {
-      /* if the client is a call pad, we'll need to initialise
-      its lowest_floor and highest_floor values to nothing */
-      strcpy(client->highest_floor, "");
-      strcpy(client->lowest_floor, "");
-      strcpy(client->name, "");
-
+      /* extract the call message details */
+      client->type = IS_CALL_PAD;
       call_msg_info call_msg;
-      handle_received_call_message(message, &call_msg);
-      printf("Received call message: %s\n", message);
-
-      char car_name[CAR_NAME_LENGTH]; // the name of the car to service the request
-      int car_fd = find_car_for_floor(&call_msg, clients, client_count, car_name);
+      parse_received_call_message(message, &call_msg);
+      printf("%s\n", message);
+      /* find a car to service the call */
+      char chosen_car_name[CAR_NAME_LENGTH];
+      int car_fd = find_car_for_floor(&call_msg, clients, client_count, chosen_car_name);
+      /* send response to the call pad */
       if (car_fd == -1)
       {
         send_message(fd, "UNAVAILABLE");
@@ -100,9 +102,17 @@ void *handle_client(void *arg)
       else
       {
         char response[64];
-        snprintf(response, sizeof(response), "Car %s", car_name);
-        printf("Sending car %s\n", response);
+        snprintf(response, sizeof(response), "Car %s", chosen_car_name);
         send_message(fd, response);
+        /* add the floors to the chosen car's queue */
+        for (int index = 0; index < client_count; index++)
+        {
+          if (strcmp(chosen_car_name, clients[index].name) == 0)
+          {
+            add_to_car_queue(&clients[index], &call_msg);
+            break;
+          }
+        }
       }
     }
     pthread_mutex_unlock(&clients_mutex);
