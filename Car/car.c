@@ -61,7 +61,7 @@ void *control_system_send_handler(void *arg)
   pthread_t controller_receive_thread;
   pthread_create(&controller_receive_thread, NULL, control_system_receive_handler, data);
 
-  /* send the initial car identication data upon first connect*/
+  /* send the initial car identication data upon first connect */
   char car_data[64];
   snprintf(car_data, sizeof(car_data), "CAR %s %s %s", data->info->name, data->info->lowest_floor, data->info->highest_floor);
   while (1)

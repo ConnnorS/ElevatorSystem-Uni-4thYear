@@ -67,12 +67,39 @@ void cleanup()
   printf("Cleanup completed.\n");
 }
 
-/* Signal handler for cleanup */
+/* signal handler for cleanup */
 void signal_handler(int signum)
 {
   printf("Received signal %d. Cleaning up...\n", signum);
   cleanup();
   exit(0); // Exit the program
+}
+
+/* keeps going through the client's queue and assigning it floors */
+void *client_queue_manager(void *arg)
+{
+  /* initialise the data */
+  client_info *client = (client_info *)arg;
+  pthread_mutex_lock(&clients_mutex);
+  int fd = client->fd;
+  pthread_mutex_unlock(&clients_mutex);
+
+  /* loop over the queue and send floors */
+  while (1)
+  {
+    pthread_mutex_lock(&clients_mutex);
+    /* if there's a floor in the queue and the car is ready */
+    printf("Waiting on queue change\n");
+    while (client->queue_length == 0)
+    {
+      pthread_cond_wait(&client->status_cond, &clients_mutex);
+      break;
+    }
+    printf("Detected queue change\n");
+    pthread_mutex_unlock(&clients_mutex);
+    sleep(1000);
+  }
+  return NULL;
 }
 
 /* for n number of connected clients there will be
@@ -101,12 +128,13 @@ void *handle_client(void *arg)
     if (strncmp(message, "CAR", 3) == 0)
     {
       handle_received_car_message(client, message, name);
-      printf("New car: %s\n", message);
+      /* if we've got a car, spin off the queue manager thread */
+      pthread_t queue_manager_thread;
+      pthread_create(&queue_manager_thread, NULL, client_queue_manager, (void *)client);
     }
     else if (strncmp(message, "STATUS", 6) == 0)
     {
       handle_received_status_message(client, message);
-      printf("%s %s\n", name, message);
     }
     else if (strncmp(message, "CALL", 4) == 0)
     {
@@ -137,6 +165,7 @@ void *handle_client(void *arg)
           if (strcmp(chosen_car_name, clients[index].name) == 0)
           {
             add_to_car_queue(&clients[index], &call_msg);
+            pthread_cond_signal(&client->status_cond);
             break;
           }
         }
@@ -174,6 +203,7 @@ int main(void)
       pthread_mutex_lock(&clients_mutex);
       clients = realloc(clients, (client_count + 1) * sizeof(client_info));
       clients[client_count].fd = new_socket;
+      pthread_cond_init(&clients[client_count].status_cond, NULL);
 
       /* create a new thread to handle each new client */
       pthread_t new_client_infothread;

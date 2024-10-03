@@ -60,6 +60,8 @@ void handle_received_car_message(client_info *client, char *message, char *name)
   strcpy(client->lowest_floor, lowest_floor);
   strcpy(client->name, name);
   client->type = IS_CAR;
+
+  printf("New car: %s %s %s\n", client->name, client->lowest_floor, client->highest_floor);
 }
 
 /* this does nothing yet except for extact data and update the status */
@@ -70,6 +72,10 @@ void handle_received_status_message(client_info *client, char *message)
   char destination_floor[4];
   sscanf(message, "%*s %7s %3s %3s", status, current_floor, destination_floor);
   strcpy(client->status, status);
+  strcpy(client->current_floor, current_floor);
+  strcpy(client->destination_floor, destination_floor);
+
+  printf("%s %s %s %s\n", client->name, client->status, client->current_floor, client->destination_floor);
 }
 
 /* this will extract the call message and assign it to the call_msg */
@@ -168,6 +174,7 @@ void add_to_car_queue(client_info *client, call_msg_info *call_msg)
     client->queue[client->queue_length - 2] = call_msg->source_floor;
     client->queue[client->queue_length - 1] = call_msg->destination_floor;
   }
+
   // Print the queue for testing
   print_queue(client);
 }

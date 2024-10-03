@@ -11,14 +11,17 @@ and the floors they service. This will help when deciding
 which car to give floors to */
 typedef struct
 {
-  int fd;         // the file descriptor of the client for sending messages
-  int type;       // whether it's a car or callpad
-  char status[8]; // C string indicating the elevator's status
+  int fd; // the file descriptor of the client for sending messages
   char name[CAR_NAME_LENGTH];
+  int type;                   // whether it's a car or callpad
+  char status[8];             // C string indicating the elevator's status
+  pthread_cond_t status_cond; // signal when the car's status changes
   char lowest_floor[4];
   char highest_floor[4];
-  int *queue;                // the array of ints for the queue
-  int queue_length;          // the length of the queue
+  char current_floor[4];
+  char destination_floor[4];
+  int *queue;       // the array of ints for the queue
+  int queue_length; // the length of the queue
 } client_info;
 
 /* structure which the handle_received_call_message() returns
