@@ -91,7 +91,7 @@ void *client_queue_manager(void *arg)
     {
       pthread_cond_wait(&client->queue_cond, &clients_mutex);
     }
-
+    printf("Signal changed\n");
     // Process the queue here
     char message[64];
     snprintf(message, sizeof(message), "FLOOR %d", client->queue[0]);
