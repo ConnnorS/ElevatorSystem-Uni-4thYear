@@ -37,3 +37,4 @@ void handle_received_car_message(client_info *client, char *message, char *name)
 void parse_received_call_message(char *message, call_msg_info *call_msg);
 int find_car_for_floor(call_msg_info *call_msg, client_info *clients, int client_count, char car_name[CAR_NAME_LENGTH], int *call_direction);
 void add_to_car_queue(client_info *client, call_msg_info *call_msg);
+void remove_floor(client_info *client);

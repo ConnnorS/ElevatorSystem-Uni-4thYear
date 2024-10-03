@@ -62,9 +62,13 @@ void *client_queue_manager(void *arg)
 
   while (1)
   {
-    printf("Waiting for queue change from thread %d\n", fd);
     pthread_cond_wait(&client->queue_cond, &clients_mutex);
-    
+    printf("New queue element\n");
+    int next_floor = client->queue[0];
+    char floor_message[64];
+    snprintf(floor_message, sizeof(floor_message), "FLOOR %d", next_floor);
+    send_message(fd, floor_message);
+    remove_floor(client);
   }
   pthread_mutex_unlock(&clients_mutex);
 }

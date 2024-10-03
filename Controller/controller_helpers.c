@@ -122,6 +122,17 @@ void print_queue(const client_info *client)
   printf("\n");
 }
 
+/* removes the most recently called floor from the queue */
+void remove_floor(client_info *client)
+{
+  for (int index = 0; index < client->queue_length - 1; index++)
+  {
+    client->queue[index] = client->queue[index + 1];
+  }
+  client->queue_length--;
+  client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
+}
+
 void add_to_car_queue(client_info *client, call_msg_info *call_msg)
 {
   // if the queue is empty, initialize it
@@ -138,37 +149,6 @@ void add_to_car_queue(client_info *client, call_msg_info *call_msg)
   }
   else
   {
-    int index = 0;
-    // add the source floor to the array
-    while (client->queue[index] < call_msg->source_floor)
-    {
-      index++;
-      if (index == client->queue_length)
-        break;
-    }
-    client->queue_length++;
-    client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
-    for (int end = client->queue_length - 1; end > index; end--)
-    {
-      client->queue[end] = client->queue[end - 1];
-    }
-    client->queue[index] = call_msg->source_floor;
-
-    // now add the destination floor
-    index = 0;
-    while (client->queue[index] < call_msg->destination_floor)
-    {
-      index++;
-      if (index == client->queue_length)
-        break;
-    }
-    client->queue_length++;
-    client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
-    for (int end = client->queue_length - 1; end > index; end--)
-    {
-      client->queue[end] = client->queue[end - 1];
-    }
-    client->queue[index] = call_msg->destination_floor;
   }
 
   // Print the queue for testing
