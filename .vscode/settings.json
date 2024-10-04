@@ -1,6 +1,7 @@
 {
   "files.associations": {
     "inet.h": "c",
-    "stdlib.h": "c"
+    "stdlib.h": "c",
+    "common_comms.h": "c"
   }
 }
