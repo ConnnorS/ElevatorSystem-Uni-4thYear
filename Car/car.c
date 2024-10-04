@@ -95,13 +95,14 @@ int main(int argc, char **argv)
   // }
 
   /* FOR TESTING */
+
   while (1)
   {
-    sleep(2);
+    sleep(5);
     printf("Sending signal\n");
     pthread_mutex_lock(&shm_status_ptr->mutex);
     print_car_shared_mem(shm_status_ptr);
-    shm_status_ptr->door_obstruction = 1;
+    shm_status_ptr->overload = 1;
     pthread_cond_signal(&shm_status_ptr->cond);
     pthread_mutex_unlock(&shm_status_ptr->mutex);
   }

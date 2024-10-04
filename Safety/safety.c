@@ -68,7 +68,7 @@ int main(int argc, char **argv)
   while (1)
   {
     pthread_mutex_lock(&shm_status_ptr->mutex);
-    while (shm_status_ptr->emergency_mode == 0 && (shm_status_ptr->door_obstruction == 0 && shm_status_ptr->emergency_stop == 0))
+    while (shm_status_ptr->door_obstruction == 0 && shm_status_ptr->emergency_stop == 0 && shm_status_ptr->overload == 0)
     {
       pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
     }
