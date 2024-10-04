@@ -12,6 +12,8 @@
 #include <arpa/inet.h>
 // my headers
 #include "car_helpers.h"
+// comms
+#include "../common_comms.h"
 
 int do_shm_open(char *shm_status_name)
 {

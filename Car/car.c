@@ -14,9 +14,14 @@
 #include <signal.h>
 // headers
 #include "car_helpers.h"
+// comms
+#include "../common_comms.h"
 
 /* global variables */
 char *shm_status_name;
+volatile sig_atomic_t system_running = 1;
+
+pthread_t server_send_handler;
 
 void print_car_shared_mem(const car_shared_mem *car)
 {
@@ -33,10 +38,12 @@ void print_car_shared_mem(const car_shared_mem *car)
   printf("Emergency Mode: %u\n", car->emergency_mode);
 }
 
-void exit_cleanup(int signal)
+void thread_cleanup(int signal)
 {
-  printf("Received exit code %d\n", signal);
-  printf("Cleaning up...\n");
+  printf("\nCleaning up...\n");
+
+  system_running = 0;
+  pthread_join(server_send_handler, NULL);
 
   if (shm_unlink(shm_status_name) == -1)
   {
@@ -45,13 +52,34 @@ void exit_cleanup(int signal)
   }
 
   free(shm_status_name);
+
   printf("Cleanup completed\n");
   exit(0);
 }
 
+void *control_system_send_handler(void *args)
+{
+  car_thread_data *client = (car_thread_data *)args;
+  printf("Control system send thread started\n");
+
+  while (system_running)
+  {
+    pthread_mutex_lock(&client->ptr->mutex);
+    char status_data[64];
+    snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", client->ptr->status, client->ptr->current_floor, client->ptr->destination_floor);
+    pthread_mutex_unlock(&client->ptr->mutex);
+
+    send_message(client->fd, (char *)status_data);
+    sleep(client->delay_ms / 1000);
+  }
+  printf("Thread ending - receiving end message\n");
+  fflush(stdout);
+  return NULL;
+}
+
 int main(int argc, char **argv)
 {
-  signal(SIGINT, exit_cleanup);
+  signal(SIGINT, thread_cleanup);
 
   if (argc != 5)
   {
@@ -93,7 +121,30 @@ int main(int argc, char **argv)
     socketFd = connect_to_control_system();
     sleep(delay_ms / 1000);
   }
+  /* send the initial identification message */
+  char car_data[64];
+  pthread_mutex_lock(&shm_status_ptr->mutex);
+  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", shm_status_ptr->status, shm_status_ptr->current_floor, shm_status_ptr->destination_floor);
+  pthread_mutex_unlock(&shm_status_ptr->mutex);
+  printf("Sending identification message...\n");
+  while (1)
+  {
+    if (send_message(socketFd, (char *)car_data) != -1)
+    {
+      break;
+    }
+    sleep(delay_ms / 1000);
+  }
 
-  exit_cleanup(1);
+  /* create the handler threads */
+  car_thread_data thread_data;
+  thread_data.fd = socketFd;
+  thread_data.ptr = shm_status_ptr;
+  thread_data.delay_ms = delay_ms;
+
+  pthread_create(&server_send_handler, NULL, control_system_send_handler, (void *)&thread_data);
+  pthread_join(server_send_handler, NULL);
+
+  thread_cleanup(1);
   return 0;
 }

@@ -18,6 +18,13 @@ typedef struct
   uint8_t emergency_mode;          // 1 if in emergency mode, else 0
 } car_shared_mem;
 
+typedef struct
+{
+  int fd;                // file descriptor of the connected server
+  int delay_ms;          // the delay of the car
+  car_shared_mem *ptr;   // the pointer to the shared memory
+} car_thread_data;
+
 /* functions used by the car component */
 int do_shm_open(char *shm_status_name);
 void do_ftruncate(int fd, int size);
