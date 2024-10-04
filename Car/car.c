@@ -135,7 +135,7 @@ int main(int argc, char **argv)
 
   /* connect to the control system */
   int socketFd = -1;
-  while (socketFd == -1)
+  while (socketFd == -1 && system_running)
   {
     socketFd = connect_to_control_system();
     sleep(delay_ms / 1000);
@@ -143,10 +143,10 @@ int main(int argc, char **argv)
   /* send the initial identification message */
   char car_data[64];
   pthread_mutex_lock(&shm_status_ptr->mutex);
-  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", shm_status_ptr->status, shm_status_ptr->current_floor, shm_status_ptr->destination_floor);
+  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", shm_status_name, shm_status_ptr->current_floor, shm_status_ptr->destination_floor);
   pthread_mutex_unlock(&shm_status_ptr->mutex);
   printf("Sending identification message...\n");
-  while (1)
+  while (system_running)
   {
     if (send_message(socketFd, (char *)car_data) != -1)
     {

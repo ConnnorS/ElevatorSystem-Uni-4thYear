@@ -27,6 +27,8 @@ void *handle_client(void *arg)
   sig_atomic_t thread_running = 1;
 
   client_t *client = (client_t *)arg;
+  initialise_mutex_cond(client);
+
   pthread_mutex_lock(&client->mutex);
   int fd = client->fd;
   pthread_mutex_unlock(&client->mutex);
@@ -42,7 +44,13 @@ void *handle_client(void *arg)
     }
     else if (strncmp(message, "CAR", 3) == 0)
     {
-
+      handle_received_car_message(client, message);
+      printf("New car connected: %s %s %s\n", client->name, client->lowest_floor, client->highest_floor);
+    }
+    else if (strncmp(message, "STATUS", 6) == 0)
+    {
+      handle_received_status_message(client, message);
+      printf("Received status message from %s: %s %s %s\n", client->name, client->status, client->current_floor, client->destination_floor);
     }
     else
     {
@@ -83,6 +91,7 @@ int main(void)
       /* increase the clients array */
       clients = realloc(clients, sizeof(client_t) * (client_count + 1));
       clients[client_count].fd = new_socket;
+
       /* create the handler thread */
       pthread_t client_handler_thread;
       pthread_create(&client_handler_thread, NULL, handle_client, (void *)&clients[client_count]);

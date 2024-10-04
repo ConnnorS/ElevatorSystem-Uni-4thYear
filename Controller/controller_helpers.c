@@ -52,11 +52,47 @@ int create_server()
 the car's data and saves it in the car's client_info data structure */
 void handle_received_car_message(client_t *client, char *message)
 {
+  /* extract the data */
   char name[64];
   char lowest_floor[4];
   char highest_floor[4];
   sscanf(message, "%*s %31s %3s %3s", name, lowest_floor, highest_floor);
+  /* lock mutex and add the data to the object */
+  pthread_mutex_lock(&client->mutex);
   strcpy(client->highest_floor, highest_floor);
   strcpy(client->lowest_floor, lowest_floor);
   strcpy(client->name, name);
+  pthread_mutex_unlock(&client->mutex);
+}
+
+/* extract all the data from the status message, update the client object
+and then signal to the queue manager that something has changed for that
+car's floor */
+void handle_received_status_message(client_t *client, char *message)
+{
+  /* extract the data */
+  char status[8];
+  char current_floor[4];
+  char destination_floor[4];
+  sscanf(message, "%*s %7s %3s %3s", status, current_floor, destination_floor);
+  /* lock the mutex and add the data to the object */
+  pthread_mutex_lock(&client->mutex);
+  strcpy(client->status, status);
+  strcpy(client->current_floor, current_floor);
+  strcpy(client->destination_floor, destination_floor);
+  pthread_cond_signal(&client->cond); // signal that the floors have changed and the queue thread might need to act
+  pthread_mutex_unlock(&client->mutex);
+}
+
+void initialise_mutex_cond(client_t *client)
+{
+  pthread_mutexattr_t attr;
+  pthread_mutexattr_init(&attr);
+  pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+  pthread_mutex_init(&client->mutex, &attr);
+
+  pthread_condattr_t cond_attr;
+  pthread_condattr_init(&cond_attr);
+  pthread_condattr_setpshared(&cond_attr, PTHREAD_PROCESS_SHARED);
+  pthread_cond_init(&client->cond, &cond_attr);
 }
