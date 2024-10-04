@@ -10,104 +10,78 @@
 #include <unistd.h>
 // networks
 #include <arpa/inet.h>
-// my functions
+// header file
 #include "controller_helpers.h"
-#include "../common_networks.h"
+// comms
+#include "../common_comms.h"
 
-/* global variables & mutex */
-client_info *clients;
-int client_count;
-pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
+/* global variables */
+volatile sig_atomic_t system_running = 1;
 
 /* for n number of connected clients there will be
 n number of threads running this function */
 void *handle_client(void *arg)
 {
-  pthread_mutex_lock(&clients_mutex);
-  client_info *client = (client_info *)arg;
-  // save the fd to a local variable to avoid constant mutex locking and unlocking
+  sig_atomic_t thread_running = 1;
+
+  client_t *client = (client_t *)arg;
+  pthread_mutex_lock(&client->mutex);
   int fd = client->fd;
-  pthread_mutex_unlock(&clients_mutex);
+  pthread_mutex_unlock(&client->mutex);
 
-  printf("New Client Handler Thread Created with fd %d\n", fd);
+  printf("New client connected with fd %d\n", fd);
 
-  while (1)
+  while (system_running && thread_running)
   {
     char *message = receive_message(fd);
     if (message == NULL)
     {
-      break;
+      thread_running = 0;
     }
-    pthread_mutex_lock(&clients_mutex);
-    if (strncmp(message, "CAR", 3) == 0)
+    else
     {
-      handle_received_car_message(client, message);
-      printf("Received car message: %s\n", message);
+      printf("%s\n", message);
     }
-    else if (strncmp(message, "STATUS", 6) == 0)
-    {
-      handle_received_status_message(client, message);
-      printf("Received status message: %s\n", message);
-    }
-    else if (strncmp(message, "CALL", 4) == 0)
-    {
-      /* if the client is a call pad, we'll need to initialise
-      its lowest_floor and highest_floor values to nothing */
-      strcpy(client->highest_floor, "");
-      strcpy(client->lowest_floor, "");
-      strcpy(client->name, "");
-
-      call_msg_info call_msg;
-      handle_received_call_message(message, &call_msg);
-      printf("Received call message: %s\n", message);
-
-      char car_name[CAR_NAME_LENGTH]; // the name of the car to service the request
-      int car_fd = find_car_for_floor(&call_msg, clients, client_count, car_name);
-      if (car_fd == -1)
-      {
-        send_message(fd, "UNAVAILABLE");
-      }
-      else
-      {
-        char response[64];
-        snprintf(response, sizeof(response), "Car %s", car_name);
-        printf("Sending car %s\n", response);
-        send_message(fd, response);
-      }
-    }
-    pthread_mutex_unlock(&clients_mutex);
   }
-  printf("Thread ending - client disconnected\n");
+
+  printf("fd %d handler thread ending - client disconnected\n", fd);
   return NULL;
+}
+
+void thread_cleanup(int signal)
+{
+  system_running = 0;
 }
 
 int main(void)
 {
-  pthread_mutex_lock(&clients_mutex);
-  clients = malloc(0);
-  client_count = 0;
-  pthread_mutex_unlock(&clients_mutex);
+  signal(SIGINT, thread_cleanup);
 
-  int new_socket;
+  /* create the empty array of clients */
+  client_t *clients = malloc(0);
+  int client_count = 0;
+
+  /* startup the server */
   int serverFd = create_server();
 
   struct sockaddr clientaddr;
   socklen_t clientaddr_len;
 
-  while (1)
+  /* for each new connected client, handle them on a thread */
+  int new_socket = -1;
+  while (system_running)
   {
     new_socket = accept(serverFd, (struct sockaddr *)&clientaddr, &clientaddr_len);
     if (new_socket >= 0)
     {
-      pthread_mutex_lock(&clients_mutex);
-      clients = realloc(clients, (client_count + 1) * sizeof(client_info));
+      /* increase the clients array */
+      clients = realloc(clients, sizeof(client_t) * (client_count + 1));
       clients[client_count].fd = new_socket;
-      /* create a new thread to handle each new client */
-      pthread_t new_client_infohread;
-      pthread_create(&new_client_infohread, NULL, handle_client, (void *)&clients[client_count]);
+      /* create the handler thread */
+      pthread_t client_handler_thread;
+      pthread_create(&client_handler_thread, NULL, handle_client, (void *)&clients[client_count]);
 
       client_count++;
-      pthread_mutex_unlock(&clients_mutex);
     }
     else
     {
@@ -117,5 +91,7 @@ int main(void)
   }
 
   free(clients);
+  close(serverFd);
+
   return 0;
 }

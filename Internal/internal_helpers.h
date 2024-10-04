@@ -1,1 +1,0 @@
-void verify_operation(const char operation[8]);

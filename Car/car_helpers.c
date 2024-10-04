@@ -8,23 +8,12 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
-// my functions
+// networks
+#include <arpa/inet.h>
+// my headers
 #include "car_helpers.h"
-#include "car_status_operations.h"
-#include "../common_helpers.h"
-
-void compare_highest_lowest(int lowest, int highest)
-{
-  if (highest < lowest)
-  {
-    printf("Highest floor (%s%d) cannot be lower than the lowest floor (%s%d)\n",
-           (highest < 0) ? "B" : "",
-           (highest < 0) ? highest * -1 : highest,
-           (lowest < 0) ? "B" : "",
-           (lowest < 0) ? lowest * -1 : lowest);
-    exit(1);
-  }
-}
+// comms
+#include "../common_comms.h"
 
 int do_shm_open(char *shm_status_name)
 {
@@ -51,10 +40,105 @@ void do_ftruncate(int fd, int size)
   }
 }
 
+/* simple function to set up a TCP connection with the controller
+then return an int which is the socketFd */
+int connect_to_control_system()
+{
+  // create the address
+  struct sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
+  if (inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr) == -1)
+  {
+    perror("inet_pton()");
+    return -1;
+  }
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(3000);
+
+  // create the socket
+  int socketFd = socket(AF_INET, SOCK_STREAM, 0);
+  if (socketFd == -1)
+  {
+    perror("socket()");
+    return -1;
+  }
+
+  // connect to the server
+  if (connect(socketFd, (const struct sockaddr *)&addr, sizeof(addr)) == -1)
+  {
+    perror("connect()");
+    return -1;
+  }
+
+  return socketFd;
+}
+
+int floor_char_to_int(char *floor)
+{
+  if (floor[0] == 'B')
+  {
+    floor[0] = '-';
+  }
+  return atoi(floor);
+}
+
+void floor_int_to_char(int floor, char *floorChar)
+{
+  if (floor < 0)
+  {
+    sprintf(floorChar, "B%d", abs(floor));
+  }
+  else
+  {
+    sprintf(floorChar, "%d", floor);
+  }
+}
+
+void validate_floor_range(int floor)
+{
+  if (floor < -99)
+  {
+    printf("Lowest or highest floor cannot be lower than B99\n");
+    exit(1);
+  }
+  else if (floor > 999)
+  {
+    printf("Lowest or highest floor cannot be higher than 999\n");
+    exit(1);
+  }
+  else if (floor == 0)
+  {
+    printf("Floor cannot be zero\n");
+    exit(1);
+  }
+}
+
+void compare_highest_lowest(int lowest, int highest)
+{
+  if (highest < lowest)
+  {
+    printf("Highest floor (%s%d) cannot be lower than the lowest floor (%s%d)\n",
+           (highest < 0) ? "B" : "",
+           (highest < 0) ? highest * -1 : highest,
+           (lowest < 0) ? "B" : "",
+           (lowest < 0) ? lowest * -1 : lowest);
+    exit(1);
+  }
+}
+
 void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor_char)
 {
-  pthread_mutex_init(&shm_status_ptr->mutex, NULL);
-  pthread_cond_init(&shm_status_ptr->cond, NULL);
+  // initialise the shared mutex
+  pthread_mutexattr_t attr;
+  pthread_mutexattr_init(&attr);
+  pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+  pthread_mutex_init(&shm_status_ptr->mutex, &attr);
+  // initialise the shared condition variable
+  pthread_condattr_t cond_attr;
+  pthread_condattr_init(&cond_attr);
+  pthread_condattr_setpshared(&cond_attr, PTHREAD_PROCESS_SHARED);
+  pthread_cond_init(&shm_status_ptr->cond, &cond_attr);
+
   strcpy(shm_status_ptr->current_floor, lowest_floor_char);
   strcpy(shm_status_ptr->destination_floor, lowest_floor_char);
   strcpy(shm_status_ptr->status, "Closed");
@@ -65,75 +149,4 @@ void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor
   shm_status_ptr->emergency_stop = 0;
   shm_status_ptr->individual_service_mode = 0;
   shm_status_ptr->emergency_mode = 0;
-}
-
-void update_current_floor(connect_data_t *data, int current_floor)
-{
-  pthread_mutex_lock(&data->status->mutex);
-  floor_int_to_char(current_floor, data->status->current_floor);
-  pthread_mutex_unlock(&data->status->mutex);
-}
-
-void update_destination_floor(connect_data_t *data, char *destination_floor)
-{
-  pthread_mutex_lock(&data->status->mutex);
-  strcpy(data->status->destination_floor, destination_floor);
-  pthread_mutex_unlock(&data->status->mutex);
-}
-
-void change_floor(connect_data_t *data, char *destination_floor)
-{
-  update_destination_floor(data, destination_floor);
-
-  int destination_floor_int = floor_char_to_int(destination_floor);
-  pthread_mutex_lock(&data->status->mutex);
-  int current_floor_int = floor_char_to_int(data->status->current_floor);
-  pthread_mutex_unlock(&data->status->mutex);
-
-  printf("Moving floors: %d -> %d\n", current_floor_int, destination_floor_int);
-
-  set_between(data);
-
-  while (1)
-  {
-    if (current_floor_int == destination_floor_int)
-    {
-      opening_doors(data);
-      sleep(data->info->delay_ms / 1000);
-      open_doors(data);
-      return;
-    }
-
-    /* Change the floor up or down by 1 */
-    /* And if the previous current floor is -1 or 1, we will make the next
-    current floor 1 or -1 (skipping over 0)*/
-    if (current_floor_int < destination_floor_int)
-    {
-      if (current_floor_int == -1)
-      {
-        current_floor_int = 1;
-      }
-      else
-      {
-        current_floor_int++;
-      }
-    }
-    else
-    {
-      if (current_floor_int == 1)
-      {
-        current_floor_int = -1;
-      }
-      else
-      {
-        current_floor_int--;
-      }
-    }
-
-    /* now update the current floor */
-    update_current_floor(data, current_floor_int);
-
-    /* And now delay until the next step */
-    sleep(data->info->delay_ms / 1000);
-  }
 }

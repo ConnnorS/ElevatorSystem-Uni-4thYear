@@ -18,20 +18,4 @@ typedef struct
   uint8_t emergency_mode;          // 1 if in emergency mode, else 0
 } car_shared_mem;
 
-typedef struct
-{
-  int fd;                // file descriptor of the connected server
-  int delay_ms;          // the delay of the car
-  pthread_mutex_t mutex; // mutex for the struct
-  car_shared_mem *ptr;   // the pointer to the shared memory
-} car_thread_data;
-
-/* functions used by the car component */
-int do_shm_open(char *shm_status_name);
-void do_ftruncate(int fd, int size);
-int connect_to_control_system();
-int floor_char_to_int(char *floor);
-void floor_int_to_char(int floor, char *floorChar);
-void validate_floor_range(int floor);
-void compare_highest_lowest(int lowest, int highest);
-void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor_char);
+/* helper functions */
