@@ -40,6 +40,10 @@ void *handle_client(void *arg)
     {
       thread_running = 0;
     }
+    else if (strncmp(message, "CAR", 3) == 0)
+    {
+
+    }
     else
     {
       printf("%s\n", message);
