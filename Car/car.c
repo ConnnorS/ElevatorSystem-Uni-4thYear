@@ -21,8 +21,6 @@
 char *shm_status_name;
 volatile sig_atomic_t system_running = 1;
 
-pthread_t server_send_handler;
-
 void print_car_shared_mem(const car_shared_mem *car)
 {
   printf("-- NEW UPDATE -- \n\n");
@@ -40,40 +38,61 @@ void print_car_shared_mem(const car_shared_mem *car)
 
 void thread_cleanup(int signal)
 {
-  printf("\nCleaning up...\n");
-
   system_running = 0;
-  pthread_join(server_send_handler, NULL);
+}
 
-  if (shm_unlink(shm_status_name) == -1)
+void *control_system_receive_handler(void *args)
+{
+  car_thread_data *client = (car_thread_data *)args;
+  pthread_mutex_lock(&client->mutex);
+  int fd = client->fd; // local fd variable to avoid constant mutex lock/unlock
+  pthread_mutex_unlock(&client->mutex);
+
+  printf("Control system receive thread started\n");
+
+  while (system_running)
   {
-    perror("shm_unlink()");
-    return;
+    char *message = receive_message(fd);
+    if (message == NULL)
+    {
+      printf("Controller disconnected\n");
+      system_running = 0;
+    }
+    else if (strcmp(message, "") == 0)
+    {
+      continue;
+    }
+    else
+    {
+      printf("%s\n", message);
+    }
   }
-
-  free(shm_status_name);
-
-  printf("Cleanup completed\n");
-  exit(0);
+  printf("Receive thread ending - received end message\n");
+  return NULL;
 }
 
 void *control_system_send_handler(void *args)
 {
   car_thread_data *client = (car_thread_data *)args;
+  pthread_mutex_lock(&client->mutex);
+  int fd = client->fd; // local fd variable to avoid constant mutex lock/unlock
+  pthread_mutex_unlock(&client->mutex);
+
   printf("Control system send thread started\n");
 
   while (system_running)
   {
+    /* prepare the message */
     pthread_mutex_lock(&client->ptr->mutex);
     char status_data[64];
     snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", client->ptr->status, client->ptr->current_floor, client->ptr->destination_floor);
     pthread_mutex_unlock(&client->ptr->mutex);
+    /* send the message */
+    send_message(fd, (char *)status_data);
 
-    send_message(client->fd, (char *)status_data);
     sleep(client->delay_ms / 1000);
   }
-  printf("Thread ending - receiving end message\n");
-  fflush(stdout);
+  printf("Send thread ending - received end message\n");
   return NULL;
 }
 
@@ -141,10 +160,31 @@ int main(int argc, char **argv)
   thread_data.fd = socketFd;
   thread_data.ptr = shm_status_ptr;
   thread_data.delay_ms = delay_ms;
+  pthread_mutexattr_t attr;
+  pthread_mutexattr_init(&attr);
+  pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+  pthread_mutex_init(&thread_data.mutex, &attr);
 
+  pthread_t server_send_handler;
   pthread_create(&server_send_handler, NULL, control_system_send_handler, (void *)&thread_data);
+
+  pthread_t server_receive_handler;
+  pthread_create(&server_receive_handler, NULL, control_system_receive_handler, (void *)&thread_data);
+
+  /* wait for the threads to end - this will happen when system_running is set
+  to 0 with CTRL + C */
+  pthread_join(server_receive_handler, NULL);
   pthread_join(server_send_handler, NULL);
 
-  thread_cleanup(1);
+  /* do the cleanup when the threads end */
+  if (shm_unlink(shm_status_name) == -1)
+  {
+    perror("shm_unlink()");
+  }
+
+  free(shm_status_name);
+
+  printf("Unlinked and freed memory\n");
+
   return 0;
 }

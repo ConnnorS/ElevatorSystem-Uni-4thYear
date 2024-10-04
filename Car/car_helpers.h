@@ -22,6 +22,7 @@ typedef struct
 {
   int fd;                // file descriptor of the connected server
   int delay_ms;          // the delay of the car
+  pthread_mutex_t mutex; // mutex for the struct
   car_shared_mem *ptr;   // the pointer to the shared memory
 } car_thread_data;
 
