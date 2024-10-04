@@ -12,14 +12,18 @@
 #include <arpa/inet.h>
 // header file
 #include "controller_helpers.h"
+// comms
+#include "../common_comms.h"
 
 /* global variables */
-volatile sig_atomic_t running = 1;
+volatile sig_atomic_t system_running = 1;
 
 /* for n number of connected clients there will be
 n number of threads running this function */
 void *handle_client(void *arg)
 {
+  sig_atomic_t thread_running = 1;
+
   client_t *client = (client_t *)arg;
   pthread_mutex_lock(&client->mutex);
   int fd = client->fd;
@@ -27,11 +31,20 @@ void *handle_client(void *arg)
 
   printf("New client connected with fd %d\n", fd);
 
-  while (running)
+  while (system_running && thread_running)
   {
-    
+    char *message = receive_message(fd);
+    if (message == NULL)
+    {
+      thread_running = 0;
+    }
+    else
+    {
+      printf("%s\n", message);
+    }
   }
 
+  printf("fd %d handler thread ending - client disconnected\n", fd);
   return NULL;
 }
 
@@ -49,7 +62,7 @@ int main(void)
 
   /* for each new connected client, handle them on a thread */
   int new_socket;
-  while (running)
+  while (system_running)
   {
     if (new_socket >= 0)
     {
