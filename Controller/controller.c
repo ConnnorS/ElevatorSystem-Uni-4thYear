@@ -69,16 +69,17 @@ int main(void)
 
   /* for each new connected client, handle them on a thread */
   int new_socket = -1;
-  while (1)
+  while (system_running)
   {
     new_socket = accept(serverFd, (struct sockaddr *)&clientaddr, &clientaddr_len);
     if (new_socket >= 0)
     {
-      clients = realloc(clients, (client_count + 1) * sizeof(client_t));
+      /* increase the clients array */
+      clients = realloc(clients, sizeof(client_t) * (client_count + 1));
       clients[client_count].fd = new_socket;
-      /* create a new thread to handle each new client */
-      pthread_t new_client_infohread;
-      pthread_create(&new_client_infohread, NULL, handle_client, (void *)&clients[client_count]);
+      /* create the handler thread */
+      pthread_t client_handler_thread;
+      pthread_create(&client_handler_thread, NULL, handle_client, (void *)&clients[client_count]);
 
       client_count++;
     }
