@@ -86,25 +86,12 @@ int main(int argc, char **argv)
   add_default_values(shm_status_ptr, argv[2]);
   pthread_mutex_unlock(&shm_status_ptr->mutex);
 
-  // /* connect to the control system */
-  // int socketFd = -1;
-  // while (socketFd == -1)
-  // {
-  //   socketFd = connect_to_control_system();
-  //   sleep(delay_ms / 1000);
-  // }
-
-  /* FOR TESTING */
-
-  while (1)
+  /* connect to the control system */
+  int socketFd = -1;
+  while (socketFd == -1)
   {
-    sleep(5);
-    printf("Sending signal\n");
-    pthread_mutex_lock(&shm_status_ptr->mutex);
-    print_car_shared_mem(shm_status_ptr);
-    shm_status_ptr->overload = 1;
-    pthread_cond_signal(&shm_status_ptr->cond);
-    pthread_mutex_unlock(&shm_status_ptr->mutex);
+    socketFd = connect_to_control_system();
+    sleep(delay_ms / 1000);
   }
 
   exit_cleanup(1);
