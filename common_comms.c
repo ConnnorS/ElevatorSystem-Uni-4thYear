@@ -49,11 +49,11 @@ char *receive_message(int socketFd)
     return "";
   }
 
-  /* receive the message */
+  /* then actually receive the message */
   if (recv(socketFd, &length, sizeof(length), 0) != sizeof(length))
   {
     fprintf(stderr, "recv got invalid length value\n");
-    return "";
+    return NULL;
   }
 
   length = ntohl(length);

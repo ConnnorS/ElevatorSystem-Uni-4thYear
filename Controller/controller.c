@@ -48,8 +48,15 @@ void *handle_client(void *arg)
   return NULL;
 }
 
+void thread_cleanup(int signal)
+{
+  system_running = 0;
+}
+
 int main(void)
 {
+  signal(SIGINT, thread_cleanup);
+
   /* create the empty array of clients */
   client_t *clients = malloc(0);
   int client_count = 0;
@@ -61,19 +68,29 @@ int main(void)
   socklen_t clientaddr_len;
 
   /* for each new connected client, handle them on a thread */
-  int new_socket;
-  while (system_running)
+  int new_socket = -1;
+  while (1)
   {
+    new_socket = accept(serverFd, (struct sockaddr *)&clientaddr, &clientaddr_len);
     if (new_socket >= 0)
     {
-      /* increase the clients array */
-      client_count++;
-      new_socket = accept(serverFd, (struct sockaddr *)&clientaddr, &clientaddr_len);
-      clients = realloc(clients, sizeof(client_t) * client_count);
+      clients = realloc(clients, (client_count + 1) * sizeof(client_t));
       clients[client_count].fd = new_socket;
-      /* create the handler thread */
-      pthread_t client_handler_thread;
-      pthread_create(&client_handler_thread, NULL, handle_client, (void *)&clients[client_count]);
+      /* create a new thread to handle each new client */
+      pthread_t new_client_infohread;
+      pthread_create(&new_client_infohread, NULL, handle_client, (void *)&clients[client_count]);
+
+      client_count++;
+    }
+    else
+    {
+      printf("Max clients reached. Connection rejected\n");
+      close(new_socket);
     }
   }
+
+  free(clients);
+  close(serverFd);
+
+  return 0;
 }
