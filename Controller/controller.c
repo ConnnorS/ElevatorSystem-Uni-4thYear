@@ -12,6 +12,8 @@
 #include <arpa/inet.h>
 // header file
 #include "controller_helpers.h"
+// signal
+#include <signal.h>
 // comms
 #include "../common_comms.h"
 
