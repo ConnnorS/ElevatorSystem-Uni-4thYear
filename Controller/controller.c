@@ -62,16 +62,20 @@ void *handle_client(void *arg)
     {
       int source_floor, destination_floor;
       extract_call_floors(message, &source_floor, &destination_floor);
-       printf("Received call message for %d-%d\n", source_floor, destination_floor);
-       int car_fd = find_car_for_floor(&source_floor, &destination_floor, clients, client_count);
-       if (car_fd != -1)
-       {
-         printf("A car can service this request\n");
-       }
-       else
-       {
-         printf("No car can service this request\n");
-       }
+      printf("Received call message for %d-%d\n", source_floor, destination_floor);
+      char chosen_car[64];
+      int car_fd = find_car_for_floor(&source_floor, &destination_floor, clients, client_count, chosen_car);
+      if (car_fd == -1)
+      {
+        send_message(fd, "UNAVAILABLE");
+      }
+      else
+      {
+        char response[68];
+        snprintf(response, sizeof(response), "Car %s", chosen_car);
+        send_message(fd, response);
+      }
+      printf("%s can service this request\n", chosen_car);
     }
     else
     {

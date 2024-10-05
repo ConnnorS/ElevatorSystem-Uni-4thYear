@@ -108,7 +108,7 @@ int floors_are_in_range(int sourceFloor, int destinationFloor, int lowestFloor, 
          (destinationFloor >= lowestFloor && destinationFloor <= highestFloor);
 }
 /* finds the fd of the car which can service the floors then adds them to the queue */
-int find_car_for_floor(int *source_floor, int *destination_floor, client_t *clients, int client_count)
+int find_car_for_floor(int *source_floor, int *destination_floor, client_t *clients, int client_count, char *chosen_car)
 {
   for (int index = 0; index < client_count; index++)
   {
@@ -119,7 +119,7 @@ int find_car_for_floor(int *source_floor, int *destination_floor, client_t *clie
     /* if the client is a car and can service the range of floors */
     if (current->type == IS_CAR && can_service)
     {
-      printf("Car with name %s can service the requested floors\n", current->name);
+      strcpy(chosen_car, current->name);
       return current->fd;
     }
   }
