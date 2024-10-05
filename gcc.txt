@@ -1,0 +1,3 @@
+gcc -o controller controller.c controller_helpers.c ../common_comms.c ../Car/car_helpers.c && ./controller
+
+gcc -o car car.c car_helpers.c ../common_comms.c && ./car one 1 50 1000

@@ -35,6 +35,8 @@ void *handle_client(void *arg)
   pthread_mutex_lock(&clients_mutex);
   initialise_cond(client);
   int fd = client->fd; // local fd variable to avoid constant mutex locks/unlocks
+  client->queue = malloc(0);
+  client->queue_length = 0;
   pthread_mutex_unlock(&clients_mutex);
 
   printf("New client connected with fd %d\n", fd);
@@ -56,7 +58,7 @@ void *handle_client(void *arg)
     else if (strncmp(message, "STATUS", 6) == 0)
     {
       handle_received_status_message(client, message);
-      // printf("Received status message from %s: %s %s %s\n", client->name, client->status, client->current_floor, client->destination_floor);
+      printf("Received status message from %s: %s %s %s\n", client->name, client->status, client->current_floor, client->destination_floor);
     }
     else if (strncmp(message, "CALL", 4) == 0)
     {
@@ -64,8 +66,8 @@ void *handle_client(void *arg)
       extract_call_floors(message, &source_floor, &destination_floor);
       printf("Received call message for %d-%d\n", source_floor, destination_floor);
       char chosen_car[64];
-      int car_fd = find_car_for_floor(&source_floor, &destination_floor, clients, client_count, chosen_car);
-      if (car_fd == -1)
+      int found = find_car_for_floor(&source_floor, &destination_floor, clients, client_count, chosen_car);
+      if (!found)
       {
         send_message(fd, "UNAVAILABLE");
       }

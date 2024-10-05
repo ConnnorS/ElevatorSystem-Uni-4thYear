@@ -110,9 +110,13 @@ int floors_are_in_range(int sourceFloor, int destinationFloor, int lowestFloor, 
 /* finds the fd of the car which can service the floors then adds them to the queue */
 int find_car_for_floor(int *source_floor, int *destination_floor, client_t *clients, int client_count, char *chosen_car)
 {
+  int found = 0;
+
+  client_t *current;
+  /* find a client which can service the request */
   for (int index = 0; index < client_count; index++)
   {
-    client_t *current = &clients[index];
+    current = &clients[index];
     int current_lowest_floor_int = floor_char_to_int(current->lowest_floor);
     int current_highest_floor_int = floor_char_to_int(current->highest_floor);
     int can_service = floors_are_in_range(*source_floor, *destination_floor, current_lowest_floor_int, current_highest_floor_int);
@@ -120,8 +124,30 @@ int find_car_for_floor(int *source_floor, int *destination_floor, client_t *clie
     if (current->type == IS_CAR && can_service)
     {
       strcpy(chosen_car, current->name);
-      return current->fd;
+      found = 1;
+      break;
     }
   }
-  return -1;
+
+  /* if found, add the floors to their queue */
+  if (found)
+  {
+    current->queue_length += 2;
+    current->queue = realloc(current->queue, sizeof(int) * (current->queue_length));
+    current->queue[current->queue_length - 2] = *source_floor;
+    current->queue[current->queue_length - 1] = *destination_floor;
+
+    /* FOR TESTING - REMOVE LATER */
+    printf("Car %s\'s queue: ", current->name);
+    for (int index = 0; index < current->queue_length; index++)
+    {
+      printf("%d,", current->queue[index]);
+    }
+    printf("\n");
+
+    // signal the watching queue thread to wake up
+    pthread_cond_signal(&current->queue_cond);
+  }
+
+  return found;
 }
