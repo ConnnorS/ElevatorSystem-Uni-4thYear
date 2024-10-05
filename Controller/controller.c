@@ -34,12 +34,13 @@ void *queue_manager(void *arg)
   {
     pthread_mutex_lock(&clients_mutex);
 
-    /* wait until the client has reached its destination floor and the doors are open */
-    while (strcmp(client->lowest_floor, client->highest_floor) != 0 && strcmp(client->status, "OPEN"))
+    /* wait while the client is not at its destination floor, the doors are not closed, and the queue is not empty */
+    // while (strcmp(client->destination_floor, client->current_floor) != 0 || strcmp(client->status, "Closed") != 0 || client->queue_length == 0)
+    while (client->queue_length == 0)
     {
       pthread_cond_wait(&client->queue_cond, &clients_mutex);
     }
-    printf("Client has hit floor and doors are open\n");
+    printf("%s %d\n", client->name, client->queue_length);
 
     pthread_mutex_unlock(&clients_mutex);
   }
@@ -79,7 +80,7 @@ void *handle_client(void *arg)
       printf("New car connected: %s %s %s\n", client->name, client->lowest_floor, client->highest_floor);
       /* create the queue manager thread */
       pthread_t queue_manager_thread;
-      pthread_create(&queue_manager_thread, NULL, queue_manager, client);
+      pthread_create(&queue_manager_thread, NULL, queue_manager, (void *)&client);
     }
     else if (strncmp(message, "STATUS", 6) == 0)
     {
@@ -104,10 +105,6 @@ void *handle_client(void *arg)
         send_message(fd, response);
       }
       printf("%s can service this request\n", chosen_car);
-    }
-    else
-    {
-      printf("%s\n", message);
     }
     pthread_mutex_unlock(&clients_mutex);
   }

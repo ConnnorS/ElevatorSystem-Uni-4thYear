@@ -16,6 +16,7 @@
 #include "car_helpers.h"
 // comms
 #include "../common_comms.h"
+#include "../type_conversions.h"
 
 /* global variables */
 char *shm_status_name;
@@ -43,10 +44,10 @@ void thread_cleanup(int signal)
 
 void *control_system_receive_handler(void *args)
 {
-  car_thread_data *client = (car_thread_data *)args;
-  pthread_mutex_lock(&client->mutex);
-  int fd = client->fd; // local fd variable to avoid constant mutex lock/unlock
-  pthread_mutex_unlock(&client->mutex);
+  car_thread_data *car = (car_thread_data *)args;
+  pthread_mutex_lock(&car->mutex);
+  int fd = car->fd; // local fd variable to avoid constant mutex lock/unlock
+  pthread_mutex_unlock(&car->mutex);
 
   printf("Control system receive thread started\n");
 
@@ -58,13 +59,11 @@ void *control_system_receive_handler(void *args)
       printf("Controller disconnected\n");
       system_running = 0;
     }
-    else if (strcmp(message, "") == 0)
+    else if (strncmp(message, "FLOOR", 5) == 0)
     {
-      continue;
-    }
-    else
-    {
-      printf("%s\n", message);
+      char floor_num[4];
+      sscanf(message, "%*s %s", floor_num);
+      go_to_floor(car, floor_num);
     }
   }
   printf("Receive thread ending - received end message\n");
