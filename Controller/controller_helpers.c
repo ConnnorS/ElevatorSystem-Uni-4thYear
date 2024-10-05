@@ -12,27 +12,7 @@
 #include <arpa/inet.h>
 // headers
 #include "controller_helpers.h"
-
-int floor_char_to_int(char *floor)
-{
-  if (floor[0] == 'B')
-  {
-    floor[0] = '-';
-  }
-  return atoi(floor);
-}
-
-void floor_int_to_char(int floor, char *floorChar)
-{
-  if (floor < 0)
-  {
-    sprintf(floorChar, "B%d", abs(floor));
-  }
-  else
-  {
-    sprintf(floorChar, "%d", floor);
-  }
-}
+#include "../type_conversions.h"
 
 int create_server()
 {
@@ -171,4 +151,18 @@ int find_car_for_floor(int *source_floor, int *destination_floor, int **clients,
   }
 
   return found;
+}
+
+/* remove the most recent floor from the queue */
+void remove_from_queue(client_t *client)
+{
+  /* shift all the values down to overwrite the first value */
+  for (int index = 0; index < client->queue_length; index++)
+  {
+    client->queue[index] = client->queue[index + 1];
+  }
+
+  /* reduce the queue length and realloc memory */
+  client->queue_length--;
+  client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
 }

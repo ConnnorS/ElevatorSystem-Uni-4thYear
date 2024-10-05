@@ -109,6 +109,11 @@ void go_to_floor(car_thread_data *data, char *destination)
 
   /* open the doors */
   opening_doors(data);
-  sleep(data->delay_ms);
+  sleep(data->delay_ms / 1000);
   open_doors(data);
+  sleep(data->delay_ms / 1000);
+  /* then close the doors */
+  closing_doors(data);
+  sleep(data->delay_ms / 1000);
+  close_doors(data);
 }

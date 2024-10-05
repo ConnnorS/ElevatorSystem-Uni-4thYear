@@ -10,17 +10,18 @@
 #include <unistd.h>
 // networks
 #include <arpa/inet.h>
-// header file
-#include "controller_helpers.h"
+#include <arpa/inet.h>
 // signal
 #include <signal.h>
-// comms
+// header file
+#include "controller_helpers.h"
 #include "../common_comms.h"
+#include "../type_conversions.h"
 
 /* global variables */
 volatile sig_atomic_t system_running = 1;
 
-int **clients;
+int **clients; // array of pointers to each client_t object for each connected client
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 int client_count;
 
@@ -40,9 +41,17 @@ void *queue_manager(void *arg)
     {
       pthread_cond_wait(&client->queue_cond, &clients_mutex);
     }
-    printf("%s %d\n", client->name, client->queue_length);
+    printf("Car %s ready - sending next floor request\n", client->name);
 
-    client->queue_length = 0;
+    /* send the next floor message */
+    char message[64];
+    char next_floor[32];
+    floor_int_to_char(client->queue[0], (char *)next_floor);
+    snprintf(message, sizeof(message), "FLOOR %s", next_floor);
+
+    send_message(client->fd, message);
+
+    remove_from_queue(client);
 
     pthread_mutex_unlock(&clients_mutex);
   }
@@ -115,7 +124,7 @@ void *handle_client(void *arg)
   }
 
   pthread_mutex_unlock(&clients_mutex);
-  printf("fd %d handler thread ending - client disconnected\n", fd);
+  printf("fd %d handler thread ending\n", fd);
   return NULL;
 }
 
