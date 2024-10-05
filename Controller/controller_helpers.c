@@ -138,12 +138,12 @@ int find_car_for_floor(int *source_floor, int *destination_floor, client_t *clie
     current->queue[current->queue_length - 1] = *destination_floor;
 
     /* FOR TESTING - REMOVE LATER */
-    printf("Car %s\'s queue: ", current->name);
-    for (int index = 0; index < current->queue_length; index++)
-    {
-      printf("%d,", current->queue[index]);
-    }
-    printf("\n");
+    // printf("Car %s\'s queue: ", current->name);
+    // for (int index = 0; index < current->queue_length; index++)
+    // {
+    //   printf("%d,", current->queue[index]);
+    // }
+    // printf("\n");
 
     // signal the watching queue thread to wake up
     pthread_cond_signal(&current->queue_cond);

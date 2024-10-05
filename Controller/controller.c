@@ -24,6 +24,29 @@ client_t *clients;
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 int client_count;
 
+/* seperate thread for each connected car to manage its queue
+and send requests to move to the floors */
+void *queue_manager(void *arg)
+{
+  client_t *client = (client_t *)arg;
+
+  while (1)
+  {
+    pthread_mutex_lock(&clients_mutex);
+
+    /* wait until the client has reached its destination floor and the doors are open */
+    while (strcmp(client->lowest_floor, client->highest_floor) != 0 && strcmp(client->status, "OPEN"))
+    {
+      pthread_cond_wait(&client->queue_cond, &clients_mutex);
+    }
+    printf("Client has hit floor and doors are open\n");
+
+    pthread_mutex_unlock(&clients_mutex);
+  }
+
+  return NULL;
+}
+
 /* for n number of connected clients there will be
 n number of threads running this function */
 void *handle_client(void *arg)
@@ -54,6 +77,9 @@ void *handle_client(void *arg)
       /* parse in the client's info */
       handle_received_car_message(client, message);
       printf("New car connected: %s %s %s\n", client->name, client->lowest_floor, client->highest_floor);
+      /* create the queue manager thread */
+      pthread_t queue_manager_thread;
+      pthread_create(&queue_manager_thread, NULL, queue_manager, client);
     }
     else if (strncmp(message, "STATUS", 6) == 0)
     {
