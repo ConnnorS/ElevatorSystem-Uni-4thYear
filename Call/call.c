@@ -12,8 +12,7 @@
 #include <arpa/inet.h>
 // my functions
 #include "../common_comms.h"
-// need to include car helpers here for the floor conversion
-#include "../Car/car_helpers.h"
+#include "../type_conversions.h"
 
 /* expect CL-arguments
 {source floor} {destination floor} */

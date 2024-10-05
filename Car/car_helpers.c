@@ -12,6 +12,8 @@
 #include <arpa/inet.h>
 // my headers
 #include "car_helpers.h"
+#include "car_status_operations.h"
+#include "../type_conversions.h"
 // comms
 #include "../common_comms.h"
 
@@ -40,92 +42,6 @@ void do_ftruncate(int fd, int size)
   }
 }
 
-/* simple function to set up a TCP connection with the controller
-then return an int which is the socketFd */
-int connect_to_control_system()
-{
-  // create the address
-  struct sockaddr_in addr;
-  memset(&addr, 0, sizeof(addr));
-  if (inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr) == -1)
-  {
-    perror("inet_pton()");
-    return -1;
-  }
-  addr.sin_family = AF_INET;
-  addr.sin_port = htons(3000);
-
-  // create the socket
-  int socketFd = socket(AF_INET, SOCK_STREAM, 0);
-  if (socketFd == -1)
-  {
-    perror("socket()");
-    return -1;
-  }
-
-  // connect to the server
-  if (connect(socketFd, (const struct sockaddr *)&addr, sizeof(addr)) == -1)
-  {
-    perror("connect()");
-    return -1;
-  }
-
-  return socketFd;
-}
-
-int floor_char_to_int(char *floor)
-{
-  if (floor[0] == 'B')
-  {
-    floor[0] = '-';
-  }
-  return atoi(floor);
-}
-
-void floor_int_to_char(int floor, char *floorChar)
-{
-  if (floor < 0)
-  {
-    sprintf(floorChar, "B%d", abs(floor));
-  }
-  else
-  {
-    sprintf(floorChar, "%d", floor);
-  }
-}
-
-void validate_floor_range(int floor)
-{
-  if (floor < -99)
-  {
-    printf("Lowest or highest floor cannot be lower than B99\n");
-    exit(1);
-  }
-  else if (floor > 999)
-  {
-    printf("Lowest or highest floor cannot be higher than 999\n");
-    exit(1);
-  }
-  else if (floor == 0)
-  {
-    printf("Floor cannot be zero\n");
-    exit(1);
-  }
-}
-
-void compare_highest_lowest(int lowest, int highest)
-{
-  if (highest < lowest)
-  {
-    printf("Highest floor (%s%d) cannot be lower than the lowest floor (%s%d)\n",
-           (highest < 0) ? "B" : "",
-           (highest < 0) ? highest * -1 : highest,
-           (lowest < 0) ? "B" : "",
-           (lowest < 0) ? lowest * -1 : lowest);
-    exit(1);
-  }
-}
-
 void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor_char)
 {
   // initialise the shared mutex
@@ -149,4 +65,55 @@ void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor
   shm_status_ptr->emergency_stop = 0;
   shm_status_ptr->individual_service_mode = 0;
   shm_status_ptr->emergency_mode = 0;
+}
+
+void go_to_floor(car_thread_data *data, char *destination)
+{
+  /* update the destination floor in the shared memory */
+  pthread_mutex_lock(&data->ptr->mutex);
+  strcpy(data->ptr->destination_floor, destination);
+  /* create ints for easier comparison */
+  int destination_int = floor_char_to_int(data->ptr->destination_floor);
+  int current_int = floor_char_to_int(data->ptr->current_floor);
+  printf("Moving from floor %s to %s\n", data->ptr->current_floor, data->ptr->destination_floor);
+  pthread_mutex_unlock(&data->ptr->mutex);
+
+  /* set the car to between mode */
+  set_between(data);
+
+  /* determine the direction the car will move */
+  int direction = 0;
+  if (current_int < destination_int)
+  {
+    direction = 1;
+  }
+  else
+  {
+    direction = -1;
+  }
+
+  /* now move the floors */
+  while (current_int != destination_int)
+  {
+    /* move the floor up or down by 1 */
+    current_int += direction;
+
+    /* update the current floor of the car */
+    pthread_mutex_lock(&data->ptr->mutex);
+    floor_int_to_char(current_int, data->ptr->current_floor);
+    pthread_mutex_unlock(&data->ptr->mutex);
+
+    /* delay until the next step */
+    sleep(data->delay_ms / 1000);
+  }
+
+  /* open the doors */
+  opening_doors(data);
+  sleep(data->delay_ms / 1000);
+  open_doors(data);
+  sleep(data->delay_ms / 1000);
+  /* then close the doors */
+  closing_doors(data);
+  sleep(data->delay_ms / 1000);
+  close_doors(data);
 }

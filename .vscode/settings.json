@@ -2,6 +2,8 @@
   "files.associations": {
     "inet.h": "c",
     "stdlib.h": "c",
-    "common_comms.h": "c"
+    "common_comms.h": "c",
+    "controller_helpers.h": "c",
+    "car_helpers.h": "c"
   }
 }

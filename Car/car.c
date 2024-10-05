@@ -16,6 +16,7 @@
 #include "car_helpers.h"
 // comms
 #include "../common_comms.h"
+#include "../type_conversions.h"
 
 /* global variables */
 char *shm_status_name;
@@ -43,10 +44,10 @@ void thread_cleanup(int signal)
 
 void *control_system_receive_handler(void *args)
 {
-  car_thread_data *client = (car_thread_data *)args;
-  pthread_mutex_lock(&client->mutex);
-  int fd = client->fd; // local fd variable to avoid constant mutex lock/unlock
-  pthread_mutex_unlock(&client->mutex);
+  car_thread_data *car = (car_thread_data *)args;
+  pthread_mutex_lock(&car->mutex);
+  int fd = car->fd; // local fd variable to avoid constant mutex lock/unlock
+  pthread_mutex_unlock(&car->mutex);
 
   printf("Control system receive thread started\n");
 
@@ -58,13 +59,11 @@ void *control_system_receive_handler(void *args)
       printf("Controller disconnected\n");
       system_running = 0;
     }
-    else if (strcmp(message, "") == 0)
+    else if (strncmp(message, "FLOOR", 5) == 0)
     {
-      continue;
-    }
-    else
-    {
-      printf("%s\n", message);
+      char floor_num[4];
+      sscanf(message, "%*s %s", floor_num);
+      go_to_floor(car, floor_num);
     }
   }
   printf("Receive thread ending - received end message\n");
@@ -106,6 +105,11 @@ int main(int argc, char **argv)
     exit(1);
   }
 
+  char lowest_floor[4];
+  char highest_floor[4];
+  strcpy(lowest_floor, argv[2]);
+  strcpy(highest_floor, argv[3]);
+
   // convert the basement floors to a negative number for easier comparison
   if (argv[2][0] == 'B')
     argv[2][0] = '-';
@@ -135,7 +139,7 @@ int main(int argc, char **argv)
 
   /* connect to the control system */
   int socketFd = -1;
-  while (socketFd == -1)
+  while (socketFd == -1 && system_running)
   {
     socketFd = connect_to_control_system();
     sleep(delay_ms / 1000);
@@ -143,10 +147,10 @@ int main(int argc, char **argv)
   /* send the initial identification message */
   char car_data[64];
   pthread_mutex_lock(&shm_status_ptr->mutex);
-  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", shm_status_ptr->status, shm_status_ptr->current_floor, shm_status_ptr->destination_floor);
+  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", shm_status_name, lowest_floor, highest_floor);
   pthread_mutex_unlock(&shm_status_ptr->mutex);
   printf("Sending identification message...\n");
-  while (1)
+  while (system_running)
   {
     if (send_message(socketFd, (char *)car_data) != -1)
     {

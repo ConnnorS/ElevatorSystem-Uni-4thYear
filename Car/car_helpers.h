@@ -29,9 +29,5 @@ typedef struct
 /* functions used by the car component */
 int do_shm_open(char *shm_status_name);
 void do_ftruncate(int fd, int size);
-int connect_to_control_system();
-int floor_char_to_int(char *floor);
-void floor_int_to_char(int floor, char *floorChar);
-void validate_floor_range(int floor);
-void compare_highest_lowest(int lowest, int highest);
 void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor_char);
+void go_to_floor(car_thread_data *data, char *destination);
