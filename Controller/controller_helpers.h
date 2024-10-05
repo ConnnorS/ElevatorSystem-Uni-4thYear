@@ -7,7 +7,8 @@ typedef struct
   char name[64]; // the car's name when it is initialised
   int type;      // 1 for car, 0 for call pad
 
-  pthread_cond_t cond; // condition to indicate some value has been updated
+  int *queue;                // the queue of floors the car is to go to
+  pthread_cond_t queue_cond; // condition to indicate some value has been updated
 
   char status[8];
   char current_floor[4];     // the current floor of the car

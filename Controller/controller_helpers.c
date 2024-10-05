@@ -79,7 +79,7 @@ void handle_received_status_message(client_t *client, char *message)
   strcpy(client->status, status);
   strcpy(client->current_floor, current_floor);
   strcpy(client->destination_floor, destination_floor);
-  pthread_cond_signal(&client->cond); // signal that the floors have changed and the queue thread might need to act
+  pthread_cond_signal(&client->queue_cond); // signal that the floors have changed and the queue thread might need to act
 }
 
 /* extracts the call pad's floors and converts them to an integer for easier comparison */
@@ -99,7 +99,7 @@ void initialise_cond(client_t *client)
   pthread_condattr_t cond_attr;
   pthread_condattr_init(&cond_attr);
   pthread_condattr_setpshared(&cond_attr, PTHREAD_PROCESS_SHARED);
-  pthread_cond_init(&client->cond, &cond_attr);
+  pthread_cond_init(&client->queue_cond, &cond_attr);
 }
 
 int floors_are_in_range(int sourceFloor, int destinationFloor, int lowestFloor, int highestFloor)
