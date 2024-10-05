@@ -127,8 +127,9 @@ int floors_are_in_range(int sourceFloor, int destinationFloor, int lowestFloor, 
   return (sourceFloor >= lowestFloor && sourceFloor <= highestFloor) &&
          (destinationFloor >= lowestFloor && destinationFloor <= highestFloor);
 }
+
 /* finds the fd of the car which can service the floors then adds them to the queue */
-int find_car_for_floor(int *source_floor, int *destination_floor, client_t *clients, int client_count, char *chosen_car)
+int find_car_for_floor(int *source_floor, int *destination_floor, int **clients, int client_count, char *chosen_car)
 {
   int found = 0;
 
@@ -136,7 +137,7 @@ int find_car_for_floor(int *source_floor, int *destination_floor, client_t *clie
   /* find a client which can service the request */
   for (int index = 0; index < client_count; index++)
   {
-    current = &clients[index];
+    current = (client_t *)clients[index];
     int current_lowest_floor_int = floor_char_to_int(current->lowest_floor);
     int current_highest_floor_int = floor_char_to_int(current->highest_floor);
     int can_service = floors_are_in_range(*source_floor, *destination_floor, current_lowest_floor_int, current_highest_floor_int);
@@ -157,7 +158,7 @@ int find_car_for_floor(int *source_floor, int *destination_floor, client_t *clie
     current->queue[current->queue_length - 2] = *source_floor;
     current->queue[current->queue_length - 1] = *destination_floor;
 
-    /* FOR TESTING - REMOVE LATER */
+    // /* FOR TESTING - REMOVE LATER */
     printf("Car %s\'s queue of length %d: ", current->name, current->queue_length);
     for (int index = 0; index < current->queue_length; index++)
     {

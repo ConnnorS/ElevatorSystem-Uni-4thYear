@@ -20,7 +20,7 @@
 /* global variables */
 volatile sig_atomic_t system_running = 1;
 
-client_t *clients;
+int **clients;
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 int client_count;
 
@@ -28,19 +28,21 @@ int client_count;
 and send requests to move to the floors */
 void *queue_manager(void *arg)
 {
-  client_t *client = (client_t *)arg;
+  client_t *client = arg;
+  // printf("New queue manager thread created for client %s\n", client->name);
 
   while (1)
   {
     pthread_mutex_lock(&clients_mutex);
 
     /* wait while the client is not at its destination floor, the doors are not closed, and the queue is not empty */
-    // while (strcmp(client->destination_floor, client->current_floor) != 0 || strcmp(client->status, "Closed") != 0 || client->queue_length == 0)
-    while (client->queue_length == 0)
+    while (strcmp(client->current_floor, client->destination_floor) != 0 || strcmp(client->status, "Closed") != 0 || client->queue_length == 0)
     {
       pthread_cond_wait(&client->queue_cond, &clients_mutex);
     }
     printf("%s %d\n", client->name, client->queue_length);
+
+    client->queue_length = 0;
 
     pthread_mutex_unlock(&clients_mutex);
   }
@@ -80,7 +82,7 @@ void *handle_client(void *arg)
       printf("New car connected: %s %s %s\n", client->name, client->lowest_floor, client->highest_floor);
       /* create the queue manager thread */
       pthread_t queue_manager_thread;
-      pthread_create(&queue_manager_thread, NULL, queue_manager, (void *)&client);
+      pthread_create(&queue_manager_thread, NULL, queue_manager, (void *)client);
     }
     else if (strncmp(message, "STATUS", 6) == 0)
     {
@@ -100,15 +102,19 @@ void *handle_client(void *arg)
       }
       else
       {
+        printf("%s can service this request\n", chosen_car);
         char response[68];
         snprintf(response, sizeof(response), "Car %s", chosen_car);
         send_message(fd, response);
       }
-      printf("%s can service this request\n", chosen_car);
+
+      /* kill the thread */
+      thread_running = 0;
     }
     pthread_mutex_unlock(&clients_mutex);
   }
 
+  pthread_mutex_unlock(&clients_mutex);
   printf("fd %d handler thread ending - client disconnected\n", fd);
   return NULL;
 }
@@ -139,17 +145,20 @@ int main(void)
     new_socket = accept(serverFd, (struct sockaddr *)&clientaddr, &clientaddr_len);
     if (new_socket >= 0)
     {
+      client_t *new_client = malloc(sizeof(client_t));
+
+      new_client->fd = new_socket;
+
       pthread_mutex_lock(&clients_mutex);
-      /* increase the clients array */
-      clients = realloc(clients, sizeof(client_t) * (client_count + 1));
-      clients[client_count].fd = new_socket;
+      /* increase the array of pointers to clients */
+      clients = (int **)realloc(clients, sizeof(int *) * (client_count + 1));
+      clients[client_count] = (int *)new_client;
+      client_count++;
       pthread_mutex_unlock(&clients_mutex);
 
       /* create the handler thread */
       pthread_t client_handler_thread;
-      pthread_create(&client_handler_thread, NULL, handle_client, (void *)&clients[client_count]);
-
-      client_count++;
+      pthread_create(&client_handler_thread, NULL, handle_client, new_client);
     }
     else
     {
