@@ -59,10 +59,24 @@ void handle_received_car_message(client_t *client, char *message)
   sscanf(message, "%*s %31s %3s %3s", name, lowest_floor, highest_floor);
   /* lock mutex and add the data to the object */
   pthread_mutex_lock(&client->mutex);
+  client->type = IS_CAR;
   strcpy(client->highest_floor, highest_floor);
   strcpy(client->lowest_floor, lowest_floor);
   strcpy(client->name, name);
   pthread_mutex_unlock(&client->mutex);
+}
+
+void add_to_client_floors_list(client_t *client, client_floors *client_floors_list, int *length)
+{
+  client_floors_list = realloc(client_floors_list, sizeof(client_floors) * (*length + 1));
+  client_floors_list[*length].fd = client->fd;
+  strcpy(client_floors_list[*length].name, client->name);
+  strcpy(client_floors_list[*length].lowest_floor, client->lowest_floor);
+  strcpy(client_floors_list[*length].highest_floor, client->highest_floor);
+
+  printf("Added client to floors list: %d %s %s-%s\n", client_floors_list[*length].fd, client_floors_list[*length].name, client_floors_list[*length].lowest_floor, client_floors_list[*length].highest_floor);
+
+  *length++;
 }
 
 /* extract all the data from the status message, update the client object
@@ -81,6 +95,19 @@ void handle_received_status_message(client_t *client, char *message)
   strcpy(client->current_floor, current_floor);
   strcpy(client->destination_floor, destination_floor);
   pthread_cond_signal(&client->cond); // signal that the floors have changed and the queue thread might need to act
+  pthread_mutex_unlock(&client->mutex);
+}
+
+void handle_call_pad_connect(client_t *client, char *message, int *source_floor, int *destination_floor)
+{
+  /* extract the data */
+  char source[4];
+  char destination[4];
+  sscanf(message, "%*s %3s %3s", source, destination);
+
+  /* update the client's info */
+  pthread_mutex_lock(&client->mutex);
+  client->type = IS_CALL;
   pthread_mutex_unlock(&client->mutex);
 }
 

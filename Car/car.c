@@ -106,6 +106,11 @@ int main(int argc, char **argv)
     exit(1);
   }
 
+  char lowest_floor[4];
+  char highest_floor[4];
+  strcpy(lowest_floor, argv[2]);
+  strcpy(highest_floor, argv[3]);
+
   // convert the basement floors to a negative number for easier comparison
   if (argv[2][0] == 'B')
     argv[2][0] = '-';
@@ -143,7 +148,7 @@ int main(int argc, char **argv)
   /* send the initial identification message */
   char car_data[64];
   pthread_mutex_lock(&shm_status_ptr->mutex);
-  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", shm_status_name, shm_status_ptr->current_floor, shm_status_ptr->destination_floor);
+  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", shm_status_name, lowest_floor, highest_floor);
   pthread_mutex_unlock(&shm_status_ptr->mutex);
   printf("Sending identification message...\n");
   while (system_running)

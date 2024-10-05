@@ -20,6 +20,21 @@
 /* global variables */
 volatile sig_atomic_t system_running = 1;
 
+client_floors *client_floors_list;
+int client_floors_list_length;
+pthread_mutex_t client_floors_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+/* a thread which is spun off from a handle_client thread
+if it receives a CALL message */
+void *call_pad_manager(void *arg)
+{
+  char *arriving_car = (char *)arg;
+
+  printf("Call message received - creating new handler thread\n");
+
+  return NULL;
+}
+
 /* for n number of connected clients there will be
 n number of threads running this function */
 void *handle_client(void *arg)
@@ -44,13 +59,30 @@ void *handle_client(void *arg)
     }
     else if (strncmp(message, "CAR", 3) == 0)
     {
+      printf("%s\n", message);
+      /* parse in the client's info */
       handle_received_car_message(client, message);
       printf("New car connected: %s %s %s\n", client->name, client->lowest_floor, client->highest_floor);
+      /* copy that to the floors list too */
+      pthread_mutex_lock(&client_floors_mutex);
+      add_to_client_floors_list(client, client_floors_list, &client_floors_list_length);
+      pthread_mutex_unlock(&client_floors_mutex);
     }
     else if (strncmp(message, "STATUS", 6) == 0)
     {
       handle_received_status_message(client, message);
       printf("Received status message from %s: %s %s %s\n", client->name, client->status, client->current_floor, client->destination_floor);
+    }
+    else if (strncmp(message, "CALL", 4) == 0)
+    {
+      /* off another thread to handle this message, wait for a response,
+      and then close both threads */
+      pthread_t call_pad_manager_thread;
+      char arriving_car[64];
+      pthread_create(&call_pad_manager_thread, NULL, call_pad_manager, (void *)&arriving_car);
+
+      pthread_join(call_pad_manager_thread, NULL);
+      printf("%s\n", arriving_car);
     }
     else
     {
@@ -74,6 +106,10 @@ int main(void)
   /* create the empty array of clients */
   client_t *clients = malloc(0);
   int client_count = 0;
+
+  /* setup the floors list */
+  client_floors_list = malloc(0);
+  client_floors_list_length = 0;
 
   /* startup the server */
   int serverFd = create_server();
