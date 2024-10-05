@@ -58,7 +58,7 @@ void handle_received_car_message(client_t *client, char *message)
   char lowest_floor[4];
   char highest_floor[4];
   sscanf(message, "%*s %31s %3s %3s", name, lowest_floor, highest_floor);
-  /* lock mutex and add the data to the object */
+
   client->type = IS_CAR;
   strcpy(client->highest_floor, highest_floor);
   strcpy(client->lowest_floor, lowest_floor);
@@ -75,7 +75,7 @@ void handle_received_status_message(client_t *client, char *message)
   char current_floor[4];
   char destination_floor[4];
   sscanf(message, "%*s %7s %3s %3s", status, current_floor, destination_floor);
-  /* lock the mutex and add the data to the object */
+
   strcpy(client->status, status);
   strcpy(client->current_floor, current_floor);
   strcpy(client->destination_floor, destination_floor);
@@ -100,4 +100,28 @@ void initialise_cond(client_t *client)
   pthread_condattr_init(&cond_attr);
   pthread_condattr_setpshared(&cond_attr, PTHREAD_PROCESS_SHARED);
   pthread_cond_init(&client->cond, &cond_attr);
+}
+
+int floors_are_in_range(int sourceFloor, int destinationFloor, int lowestFloor, int highestFloor)
+{
+  return (sourceFloor >= lowestFloor && sourceFloor <= highestFloor) &&
+         (destinationFloor >= lowestFloor && destinationFloor <= highestFloor);
+}
+/* finds the fd of the car which can service the floors then adds them to the queue */
+int find_car_for_floor(int *source_floor, int *destination_floor, client_t *clients, int client_count)
+{
+  for (int index = 0; index < client_count; index++)
+  {
+    client_t *current = &clients[index];
+    int current_lowest_floor_int = floor_char_to_int(current->lowest_floor);
+    int current_highest_floor_int = floor_char_to_int(current->highest_floor);
+    int can_service = floors_are_in_range(*source_floor, *destination_floor, current_lowest_floor_int, current_highest_floor_int);
+    /* if the client is a car and can service the range of floors */
+    if (current->type == IS_CAR && can_service)
+    {
+      printf("Car with name %s can service the requested floors\n", current->name);
+      return current->fd;
+    }
+  }
+  return -1;
 }

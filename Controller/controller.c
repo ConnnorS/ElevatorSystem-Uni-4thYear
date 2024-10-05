@@ -41,8 +41,8 @@ void *handle_client(void *arg)
 
   while (system_running && thread_running)
   {
-    pthread_mutex_lock(&clients_mutex);
     char *message = receive_message(fd);
+    pthread_mutex_lock(&clients_mutex);
     if (message == NULL)
     {
       thread_running = 0;
@@ -56,14 +56,22 @@ void *handle_client(void *arg)
     else if (strncmp(message, "STATUS", 6) == 0)
     {
       handle_received_status_message(client, message);
-      printf("Received status message from %s: %s %s %s\n", client->name, client->status, client->current_floor, client->destination_floor);
+      // printf("Received status message from %s: %s %s %s\n", client->name, client->status, client->current_floor, client->destination_floor);
     }
     else if (strncmp(message, "CALL", 4) == 0)
     {
-      int source_floor;
-      int destination_floor;
+      int source_floor, destination_floor;
       extract_call_floors(message, &source_floor, &destination_floor);
-      printf("Received call message for %d-%d\n", source_floor, destination_floor);
+       printf("Received call message for %d-%d\n", source_floor, destination_floor);
+       int car_fd = find_car_for_floor(&source_floor, &destination_floor, clients, client_count);
+       if (car_fd != -1)
+       {
+         printf("A car can service this request\n");
+       }
+       else
+       {
+         printf("No car can service this request\n");
+       }
     }
     else
     {
@@ -106,11 +114,11 @@ int main(void)
       /* increase the clients array */
       clients = realloc(clients, sizeof(client_t) * (client_count + 1));
       clients[client_count].fd = new_socket;
+      pthread_mutex_unlock(&clients_mutex);
 
       /* create the handler thread */
       pthread_t client_handler_thread;
       pthread_create(&client_handler_thread, NULL, handle_client, (void *)&clients[client_count]);
-      pthread_mutex_unlock(&clients_mutex);
 
       client_count++;
     }
