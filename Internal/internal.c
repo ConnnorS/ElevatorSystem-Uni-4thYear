@@ -22,8 +22,8 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  char shm_status_name[64] = "/car";
-  char operation[8];
+  char shm_status_name[64];
+  char operation[12];
   snprintf(shm_status_name, sizeof(shm_status_name), "/car%s", argv[1]);
   strcpy((char *)operation, argv[2]);
 
@@ -110,8 +110,10 @@ int main(int argc, char **argv)
   }
 
   /* finally, signal the cond and exit */
-  pthread_cond_broadcast(&shm_status_ptr->cond);
+  pthread_cond_signal(&shm_status_ptr->cond);
   pthread_mutex_unlock(&shm_status_ptr->mutex);
+
+  munmap(shm_status_ptr, sizeof(car_shared_mem));
 
   return 0;
 }

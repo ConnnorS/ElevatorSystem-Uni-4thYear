@@ -51,6 +51,9 @@ void *queue_manager(void *arg)
 
     send_message(client->fd, message);
 
+    // update the destination floor server side to prevent it from jumping the gun and sending another request
+    floor_int_to_char(client->queue[0], client->destination_floor);
+
     remove_from_queue(client);
 
     pthread_mutex_unlock(&clients_mutex);

@@ -5,6 +5,7 @@
     "common_comms.h": "c",
     "controller_helpers.h": "c",
     "car_helpers.h": "c",
-    "safety_helpers.h": "c"
+    "safety_helpers.h": "c",
+    "car_status_operations.h": "c"
   }
 }

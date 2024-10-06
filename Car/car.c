@@ -17,10 +17,14 @@
 // comms
 #include "../common_comms.h"
 #include "../type_conversions.h"
+#include "car_status_operations.h"
 
 /* global variables */
 char *shm_status_name;
 volatile sig_atomic_t system_running = 1;
+volatile sig_atomic_t service_mode = 0;
+
+car_shared_mem *shm_status_ptr;
 
 pthread_t server_receive_handler;
 pthread_t server_send_handler;
@@ -117,6 +121,7 @@ void *control_system_send_handler(void *args)
     pthread_mutex_lock(&client->ptr->mutex);
     char status_data[64];
     snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", client->ptr->status, client->ptr->current_floor, client->ptr->destination_floor);
+    printf("Sending status %s\n", status_data);
     pthread_mutex_unlock(&client->ptr->mutex);
     /* send the message */
     send_message(socketFd, (char *)status_data);
@@ -162,7 +167,7 @@ int main(int argc, char **argv)
   snprintf(shm_status_name, sizeof(shm_status_name), "/car%s", argv[1]);
   int shm_status_fd = do_shm_open(shm_status_name);
   do_ftruncate(shm_status_fd, sizeof(car_shared_mem));
-  car_shared_mem *shm_status_ptr = mmap(0, sizeof(car_shared_mem), PROT_WRITE | PROT_READ, MAP_SHARED, shm_status_fd, 0);
+  shm_status_ptr = mmap(0, sizeof(car_shared_mem), PROT_WRITE | PROT_READ, MAP_SHARED, shm_status_fd, 0);
 
   /* add in the default values to the shared memory object */
   pthread_mutex_lock(&shm_status_ptr->mutex);
@@ -185,13 +190,32 @@ int main(int argc, char **argv)
   pthread_create(&server_send_handler, NULL, control_system_send_handler, (void *)&thread_data);
 
   /* wait for commands from the internal controls or the safety system and act accordingly */
-  while (1)
+  while (system_running)
   {
     pthread_mutex_lock(&shm_status_ptr->mutex);
 
-    while (1)
+    /* while the car is not in service mode or the doors are not open/closed */
+    // while (shm_status_ptr->individual_service_mode != 1 || (strcmp(shm_status_ptr->status, "Closed") != 0 && strcmp(shm_status_ptr->status, "Open") != 0))
+    while (system_running && shm_status_ptr->individual_service_mode == 0)
     {
       pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
+    }
+
+    /* if in service mode */
+    if (shm_status_ptr->individual_service_mode == 1)
+    {
+      service_mode = 1;
+      printf("Car is in service mode\n");
+      if (strcmp(shm_status_ptr->status, "Between") == 0)
+      {
+        pthread_mutex_lock(&thread_data.mutex);
+        closing_doors(&thread_data);
+        sleep(thread_data.delay_ms / 1000);
+        close_doors(&thread_data);
+        pthread_mutex_unlock(&thread_data.mutex);
+      }
+      strcpy(shm_status_ptr->destination_floor, shm_status_ptr->current_floor);
+      shm_status_ptr->individual_service_mode = 0;
     }
 
     pthread_mutex_unlock(&shm_status_ptr->mutex);
