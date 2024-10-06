@@ -22,6 +22,9 @@
 char *shm_status_name;
 volatile sig_atomic_t system_running = 1;
 
+pthread_t server_receive_handler;
+pthread_t server_send_handler;
+
 void print_car_shared_mem(const car_shared_mem *car)
 {
   printf("-- NEW UPDATE -- \n\n");
@@ -72,12 +75,41 @@ void *control_system_receive_handler(void *args)
 
 void *control_system_send_handler(void *args)
 {
+  printf("Control system send thread started\n");
+
   car_thread_data *client = (car_thread_data *)args;
+
   pthread_mutex_lock(&client->mutex);
-  int fd = client->fd; // local fd variable to avoid constant mutex lock/unlock
+  int delay_ms = client->delay_ms;
   pthread_mutex_unlock(&client->mutex);
 
-  printf("Control system send thread started\n");
+  /* connect to the control system */
+  int socketFd = -1;
+  while (socketFd == -1 && system_running)
+  {
+    socketFd = connect_to_control_system();
+    sleep(delay_ms / 1000);
+  }
+
+  pthread_mutex_lock(&client->mutex);
+  client->fd = socketFd;
+  pthread_mutex_unlock(&client->mutex);
+
+  /* now create the receive thread once connected to the control system */
+  pthread_create(&server_receive_handler, NULL, control_system_receive_handler, client);
+
+  /* send the initial identification message */
+  char car_data[64];
+  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", shm_status_name, client->lowest_floor, client->highest_floor);
+  printf("Sending identification message...\n");
+  while (system_running)
+  {
+    if (send_message(socketFd, (char *)car_data) != -1)
+    {
+      break;
+    }
+    sleep(delay_ms / 1000);
+  }
 
   while (system_running)
   {
@@ -87,7 +119,7 @@ void *control_system_send_handler(void *args)
     snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", client->ptr->status, client->ptr->current_floor, client->ptr->destination_floor);
     pthread_mutex_unlock(&client->ptr->mutex);
     /* send the message */
-    send_message(fd, (char *)status_data);
+    send_message(socketFd, (char *)status_data);
 
     sleep(client->delay_ms / 1000);
   }
@@ -137,43 +169,33 @@ int main(int argc, char **argv)
   add_default_values(shm_status_ptr, argv[2]);
   pthread_mutex_unlock(&shm_status_ptr->mutex);
 
-  /* connect to the control system */
-  int socketFd = -1;
-  while (socketFd == -1 && system_running)
-  {
-    socketFd = connect_to_control_system();
-    sleep(delay_ms / 1000);
-  }
-  /* send the initial identification message */
-  char car_data[64];
-  pthread_mutex_lock(&shm_status_ptr->mutex);
-  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", shm_status_name, lowest_floor, highest_floor);
-  pthread_mutex_unlock(&shm_status_ptr->mutex);
-  printf("Sending identification message...\n");
-  while (system_running)
-  {
-    if (send_message(socketFd, (char *)car_data) != -1)
-    {
-      break;
-    }
-    sleep(delay_ms / 1000);
-  }
-
   /* create the handler threads */
   car_thread_data thread_data;
-  thread_data.fd = socketFd;
+  thread_data.fd = -1;
   thread_data.ptr = shm_status_ptr;
   thread_data.delay_ms = delay_ms;
+  strcpy(thread_data.lowest_floor, lowest_floor);
+  strcpy(thread_data.highest_floor, highest_floor);
+
   pthread_mutexattr_t attr;
   pthread_mutexattr_init(&attr);
   pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
   pthread_mutex_init(&thread_data.mutex, &attr);
 
-  pthread_t server_send_handler;
   pthread_create(&server_send_handler, NULL, control_system_send_handler, (void *)&thread_data);
 
-  pthread_t server_receive_handler;
-  pthread_create(&server_receive_handler, NULL, control_system_receive_handler, (void *)&thread_data);
+  /* wait for commands from the internal controls or the safety system and act accordingly */
+  while (1)
+  {
+    pthread_mutex_lock(&shm_status_ptr->mutex);
+
+    while (1)
+    {
+      pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
+    }
+
+    pthread_mutex_unlock(&shm_status_ptr->mutex);
+  }
 
   /* wait for the threads to end - this will happen when system_running is set
   to 0 with CTRL + C */
