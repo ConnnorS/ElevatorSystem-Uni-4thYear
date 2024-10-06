@@ -24,12 +24,10 @@ typedef struct
   int delay_ms; // the delay of the car
   char lowest_floor[4];
   char highest_floor[4];
-  pthread_mutex_t mutex; // mutex for the struct
-  car_shared_mem *ptr;   // the pointer to the shared memory
 } car_thread_data;
 
 /* functions used by the car component */
 int do_shm_open(char *shm_status_name);
 void do_ftruncate(int fd, int size);
 void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor_char);
-void go_to_floor(car_thread_data *data, char *destination);
+void move_floors(car_shared_mem *shm_status_ptr, int direction, int delay_ms);

@@ -59,6 +59,9 @@ void *queue_manager(void *arg)
     pthread_mutex_unlock(&clients_mutex);
   }
 
+  pthread_mutex_lock(&clients_mutex);
+  printf("Queue manager thread for fd %d ending\n", client->fd);
+  pthread_mutex_unlock(&clients_mutex);
   return NULL;
 }
 

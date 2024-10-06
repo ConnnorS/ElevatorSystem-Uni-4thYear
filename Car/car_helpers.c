@@ -67,53 +67,39 @@ void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor
   shm_status_ptr->emergency_mode = 0;
 }
 
-void go_to_floor(car_thread_data *data, char *destination)
+void move_floors(car_shared_mem *shm_status_ptr, int direction, int delay_ms)
 {
-  /* update the destination floor in the shared memory */
-  pthread_mutex_lock(&data->ptr->mutex);
-  strcpy(data->ptr->destination_floor, destination);
-  /* create ints for easier comparison */
-  int destination_int = floor_char_to_int(data->ptr->destination_floor);
-  int current_int = floor_char_to_int(data->ptr->current_floor);
-  printf("Moving from floor %s to %s\n", data->ptr->current_floor, data->ptr->destination_floor);
-  pthread_mutex_unlock(&data->ptr->mutex);
+  /* now set the car to between */
+  set_between(shm_status_ptr);
 
-  /* set the car to between mode */
-  set_between(data);
+  /* now move up or down one floor */
+  int current_floor_int = floor_char_to_int(shm_status_ptr->current_floor);
+  current_floor_int += direction;
+  floor_int_to_char(current_floor_int, shm_status_ptr->current_floor);
 
-  /* determine the direction the car will move */
-  int direction = 0;
-  if (current_int < destination_int)
+  printf("Car is now on floor %s\n", shm_status_ptr->current_floor);
+
+  /* if the car hits the destination floor */
+  if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0)
   {
-    direction = 1;
+    opening_doors(shm_status_ptr);
+
+    pthread_mutex_unlock(&shm_status_ptr->mutex);
+    sleep(delay_ms / 1000);
+    pthread_mutex_lock(&shm_status_ptr->mutex);
+
+    open_doors(shm_status_ptr);
+
+    pthread_mutex_unlock(&shm_status_ptr->mutex);
+    sleep(delay_ms / 1000);
+    pthread_mutex_lock(&shm_status_ptr->mutex);
+
+    closing_doors(shm_status_ptr);
+
+    pthread_mutex_unlock(&shm_status_ptr->mutex);
+    sleep(delay_ms / 1000);
+    pthread_mutex_lock(&shm_status_ptr->mutex);
+
+    close_doors(shm_status_ptr);
   }
-  else
-  {
-    direction = -1;
-  }
-
-  /* now move the floors */
-  while (current_int != destination_int)
-  {
-    /* move the floor up or down by 1 */
-    current_int += direction;
-
-    /* update the current floor of the car */
-    pthread_mutex_lock(&data->ptr->mutex);
-    floor_int_to_char(current_int, data->ptr->current_floor);
-    pthread_mutex_unlock(&data->ptr->mutex);
-
-    /* delay until the next step */
-    sleep(data->delay_ms / 1000);
-  }
-
-  /* open the doors */
-  opening_doors(data);
-  sleep(data->delay_ms / 1000);
-  open_doors(data);
-  sleep(data->delay_ms / 1000);
-  /* then close the doors */
-  closing_doors(data);
-  sleep(data->delay_ms / 1000);
-  close_doors(data);
 }

@@ -22,7 +22,6 @@
 /* global variables */
 char *shm_status_name;
 volatile sig_atomic_t system_running = 1;
-volatile sig_atomic_t service_mode = 0;
 
 car_shared_mem *shm_status_ptr;
 
@@ -47,14 +46,15 @@ void print_car_shared_mem(const car_shared_mem *car)
 void thread_cleanup(int signal)
 {
   system_running = 0;
+  pthread_mutex_lock(&shm_status_ptr->mutex);
+  pthread_cond_broadcast(&shm_status_ptr->cond);
+  pthread_mutex_unlock(&shm_status_ptr->mutex);
 }
 
 void *control_system_receive_handler(void *args)
 {
   car_thread_data *car = (car_thread_data *)args;
-  pthread_mutex_lock(&car->mutex);
   int fd = car->fd; // local fd variable to avoid constant mutex lock/unlock
-  pthread_mutex_unlock(&car->mutex);
 
   printf("Control system receive thread started\n");
 
@@ -70,7 +70,10 @@ void *control_system_receive_handler(void *args)
     {
       char floor_num[4];
       sscanf(message, "%*s %s", floor_num);
-      go_to_floor(car, floor_num);
+      pthread_mutex_lock(&shm_status_ptr->mutex);
+      strcpy(shm_status_ptr->destination_floor, floor_num);
+      pthread_cond_broadcast(&shm_status_ptr->cond);
+      pthread_mutex_unlock(&shm_status_ptr->mutex);
     }
   }
   printf("Receive thread ending - received end message\n");
@@ -81,11 +84,9 @@ void *control_system_send_handler(void *args)
 {
   printf("Control system send thread started\n");
 
-  car_thread_data *client = (car_thread_data *)args;
+  car_thread_data *car = (car_thread_data *)args;
 
-  pthread_mutex_lock(&client->mutex);
-  int delay_ms = client->delay_ms;
-  pthread_mutex_unlock(&client->mutex);
+  int delay_ms = car->delay_ms; // local copies of the object pointer to avoid mutexes
 
   /* connect to the control system */
   int socketFd = -1;
@@ -94,17 +95,14 @@ void *control_system_send_handler(void *args)
     socketFd = connect_to_control_system();
     sleep(delay_ms / 1000);
   }
-
-  pthread_mutex_lock(&client->mutex);
-  client->fd = socketFd;
-  pthread_mutex_unlock(&client->mutex);
+  car->fd = socketFd;
 
   /* now create the receive thread once connected to the control system */
-  pthread_create(&server_receive_handler, NULL, control_system_receive_handler, client);
+  pthread_create(&server_receive_handler, NULL, control_system_receive_handler, car);
 
   /* send the initial identification message */
   char car_data[64];
-  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", shm_status_name, client->lowest_floor, client->highest_floor);
+  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", shm_status_name, car->lowest_floor, car->highest_floor);
   printf("Sending identification message...\n");
   while (system_running)
   {
@@ -118,15 +116,15 @@ void *control_system_send_handler(void *args)
   while (system_running)
   {
     /* prepare the message */
-    pthread_mutex_lock(&client->ptr->mutex);
+    pthread_mutex_lock(&shm_status_ptr->mutex);
     char status_data[64];
-    snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", client->ptr->status, client->ptr->current_floor, client->ptr->destination_floor);
+    snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", shm_status_ptr->status, shm_status_ptr->current_floor, shm_status_ptr->destination_floor);
     printf("Sending status %s\n", status_data);
-    pthread_mutex_unlock(&client->ptr->mutex);
+    pthread_mutex_unlock(&shm_status_ptr->mutex);
     /* send the message */
     send_message(socketFd, (char *)status_data);
 
-    sleep(client->delay_ms / 1000);
+    sleep(car->delay_ms / 1000);
   }
   printf("Send thread ending - received end message\n");
   return NULL;
@@ -177,48 +175,73 @@ int main(int argc, char **argv)
   /* create the handler threads */
   car_thread_data thread_data;
   thread_data.fd = -1;
-  thread_data.ptr = shm_status_ptr;
   thread_data.delay_ms = delay_ms;
   strcpy(thread_data.lowest_floor, lowest_floor);
   strcpy(thread_data.highest_floor, highest_floor);
 
-  pthread_mutexattr_t attr;
-  pthread_mutexattr_init(&attr);
-  pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
-  pthread_mutex_init(&thread_data.mutex, &attr);
-
   pthread_create(&server_send_handler, NULL, control_system_send_handler, (void *)&thread_data);
+
+  // allows the shared mem's service mode to be set to 0 and have the car cond_wait() until it is out of service mode
+  volatile sig_atomic_t in_service_mode = 0;
 
   /* wait for commands from the internal controls or the safety system and act accordingly */
   while (system_running)
   {
     pthread_mutex_lock(&shm_status_ptr->mutex);
 
-    /* while the car is not in service mode or the doors are not open/closed */
-    // while (shm_status_ptr->individual_service_mode != 1 || (strcmp(shm_status_ptr->status, "Closed") != 0 && strcmp(shm_status_ptr->status, "Open") != 0))
-    while (system_running && shm_status_ptr->individual_service_mode == 0)
+    /* wait until one of the following conditions are met: the system is NOT running,
+    the car is in service mode, the current floor != the destination floor */
+    while (system_running &&
+           //(shm_status_ptr->individual_service_mode == 0 || in_service_mode == 1) &&
+           (shm_status_ptr->individual_service_mode == 0 && in_service_mode == 0) ||
+           (shm_status_ptr->individual_service_mode == 1 && in_service_mode == 1) &&
+           strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0)
     {
       pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
     }
 
-    /* if in service mode */
+    /* if placed into service mode */
     if (shm_status_ptr->individual_service_mode == 1)
     {
-      service_mode = 1;
       printf("Car is in service mode\n");
+      in_service_mode = 1;
       if (strcmp(shm_status_ptr->status, "Between") == 0)
       {
-        pthread_mutex_lock(&thread_data.mutex);
-        closing_doors(&thread_data);
+        closing_doors(shm_status_ptr);
         sleep(thread_data.delay_ms / 1000);
-        close_doors(&thread_data);
-        pthread_mutex_unlock(&thread_data.mutex);
+        close_doors(shm_status_ptr);
       }
       strcpy(shm_status_ptr->destination_floor, shm_status_ptr->current_floor);
-      shm_status_ptr->individual_service_mode = 0;
+    }
+
+    /* if taken out of service mode */
+    else if (shm_status_ptr->individual_service_mode == 0 && in_service_mode == 1)
+    {
+      printf("Car taken out of service mode\n");
+      in_service_mode = 0;
+    }
+
+    /* if the current floor is not the destination floor - it must move up or down one */
+    else if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) != 0)
+    {
+      /* find the direction the car must move */
+      int direction;
+      if (floor_char_to_int(shm_status_ptr->current_floor) < floor_char_to_int(shm_status_ptr->destination_floor))
+      {
+        direction = 1; // up
+      }
+      else
+      {
+        direction = -1; // down
+      }
+
+      /* now move floors */
+      move_floors(shm_status_ptr, direction, delay_ms);
     }
 
     pthread_mutex_unlock(&shm_status_ptr->mutex);
+
+    sleep(delay_ms / 1000);
   }
 
   /* wait for the threads to end - this will happen when system_running is set
