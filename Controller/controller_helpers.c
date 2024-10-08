@@ -147,7 +147,8 @@ int find_car_for_floor(int *source_floor, int *destination_floor, int **clients,
     printf("\n");
 
     // signal the watching queue thread to wake up
-    pthread_cond_signal(&current->queue_cond);
+    int signal = pthread_cond_signal(&current->queue_cond);
+    printf("%d\n", signal);
   }
 
   return found;

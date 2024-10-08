@@ -36,10 +36,11 @@ void *queue_manager(void *arg)
   {
     pthread_mutex_lock(&clients_mutex);
 
-    /* wait while the client is not at its destination floor, the doors are not closed, and the queue is not empty */
+    /* wait while the client is not at its destination floor, the doors are not closed, and the queue is empty */
     while (strcmp(client->current_floor, client->destination_floor) != 0 || strcmp(client->status, "Closed") != 0 || client->queue_length == 0)
     {
-      pthread_cond_wait(&client->queue_cond, &clients_mutex);
+      int receive = pthread_cond_wait(&client->queue_cond, &clients_mutex);
+      printf("Received cond: %d\n", receive);
     }
     printf("Car %s ready - sending next floor request\n", client->name);
 
@@ -182,7 +183,18 @@ int main(void)
     }
   }
 
+  /* free each individual client_t */
+  printf("Freeing client_t objects\n");
+  for (int index = 0; index < client_count; index++)
+  {
+    client_t *current = (client_t *)clients[index];
+    free(current->queue);
+    free(current);
+  }
+  /* and free the array of pointers to the clients array */
+  printf("Freeing the clients array\n");
   free(clients);
+  printf("Closing socket\n");
   close(serverFd);
 
   return 0;
