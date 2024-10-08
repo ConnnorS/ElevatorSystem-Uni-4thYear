@@ -192,7 +192,6 @@ int main(int argc, char **argv)
     /* wait until one of the following conditions are met: the system is NOT running,
     the car is in service mode, the current floor != the destination floor */
     while (system_running &&
-           //(shm_status_ptr->individual_service_mode == 0 || in_service_mode == 1) &&
            (shm_status_ptr->individual_service_mode == 0 && in_service_mode == 0) ||
            (shm_status_ptr->individual_service_mode == 1 && in_service_mode == 1) &&
            strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0)
