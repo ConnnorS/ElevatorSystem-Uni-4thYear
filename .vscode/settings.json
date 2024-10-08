@@ -9,6 +9,7 @@
     "car_status_operations.h": "c",
     "array": "c",
     "string": "c",
-    "string_view": "c"
+    "string_view": "c",
+    "mman.h": "c"
   }
 }

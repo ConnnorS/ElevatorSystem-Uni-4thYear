@@ -39,8 +39,7 @@ void *queue_manager(void *arg)
     /* wait while the client is not at its destination floor, the doors are not closed, and the queue is empty */
     while (strcmp(client->current_floor, client->destination_floor) != 0 || strcmp(client->status, "Closed") != 0 || client->queue_length == 0)
     {
-      int receive = pthread_cond_wait(&client->queue_cond, &clients_mutex);
-      printf("Received cond: %d\n", receive);
+      pthread_cond_wait(&client->queue_cond, &clients_mutex);
     }
     printf("Car %s ready - sending next floor request\n", client->name);
 
@@ -75,7 +74,7 @@ void *handle_client(void *arg)
   client_t *client = (client_t *)arg;
 
   pthread_mutex_lock(&clients_mutex);
-  initialise_cond(client);
+  pthread_cond_init(&client->queue_cond, NULL);
   int fd = client->fd; // local fd variable to avoid constant mutex locks/unlocks
   client->queue = malloc(0);
   client->queue_length = 0;
