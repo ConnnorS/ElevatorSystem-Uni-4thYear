@@ -68,7 +68,7 @@ int main(int argc, char **argv)
   }
 
   /* if the up or down command is entered but the car is moving */
-  if ((strcmp(operation, "up") == 0 || strcmp(operation, "down") == 0) && strcmp(shm_status_ptr->status, "Between") != 0)
+  if ((strcmp(operation, "up") == 0 || strcmp(operation, "down") == 0) && strcmp(shm_status_ptr->status, "Between") == 0)
   {
     printf("Operation not allowed while elevator is moving.\n");
     exit(1);

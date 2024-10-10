@@ -22,6 +22,7 @@
 /* global variables */
 char *shm_status_name;
 volatile sig_atomic_t system_running = 1;
+volatile sig_atomic_t in_service_mode = 0;
 
 car_shared_mem *shm_status_ptr;
 
@@ -119,7 +120,6 @@ void *control_system_send_handler(void *args)
     pthread_mutex_lock(&shm_status_ptr->mutex);
     char status_data[64];
     snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", shm_status_ptr->status, shm_status_ptr->current_floor, shm_status_ptr->destination_floor);
-    printf("Sending status %s\n", status_data);
     pthread_mutex_unlock(&shm_status_ptr->mutex);
     /* send the message */
     send_message(socketFd, (char *)status_data);
@@ -181,20 +181,15 @@ int main(int argc, char **argv)
 
   pthread_create(&server_send_handler, NULL, control_system_send_handler, (void *)&thread_data);
 
-  // allows the shared mem's service mode to be set to 0 and have the car cond_wait() until it is out of service mode
-  volatile sig_atomic_t in_service_mode = 0;
-
   /* wait for commands from the internal controls or the safety system and act accordingly */
   while (system_running)
   {
     pthread_mutex_lock(&shm_status_ptr->mutex);
 
-    /* wait until one of the following conditions are met: the system is NOT running,
-    the car is in service mode, the current floor != the destination floor */
-    while (system_running &&
-           (shm_status_ptr->individual_service_mode == 0 && in_service_mode == 0) ||
-           (shm_status_ptr->individual_service_mode == 1 && in_service_mode == 1) &&
-           strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0)
+    /* wait while... */
+    while (system_running &&                                                                // the system is running
+           strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0 && // the car is at destination floor
+           shm_status_ptr->individual_service_mode == 0)                                    // it is not in service mode
     {
       pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
     }
@@ -203,39 +198,57 @@ int main(int argc, char **argv)
     if (shm_status_ptr->individual_service_mode == 1)
     {
       printf("Car is in service mode\n");
-      in_service_mode = 1;
-      if (strcmp(shm_status_ptr->status, "Between") == 0)
+      in_service_mode = 1;                                // tell threads that the car is in service mode
+      if (strcmp(shm_status_ptr->status, "Between") == 0) // if status is 'Between' close the doors
       {
         closing_doors(shm_status_ptr);
         sleep(thread_data.delay_ms / 1000);
         close_doors(shm_status_ptr);
       }
-      strcpy(shm_status_ptr->destination_floor, shm_status_ptr->current_floor);
-    }
+      strcpy(shm_status_ptr->destination_floor, shm_status_ptr->current_floor); // set the destination floor to the current floor
 
-    /* if taken out of service mode */
-    else if (shm_status_ptr->individual_service_mode == 0 && in_service_mode == 1)
-    {
-      printf("Car taken out of service mode\n");
-      in_service_mode = 0;
+      /* wait for technician's command while... */
+      while (system_running &&                                                                // system is running
+             strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0 && // the car is at destination floor
+             shm_status_ptr->open_button == 0 &&                                              // the open button hasn't been pressed
+             shm_status_ptr->close_button == 0 &&                                             // the close button hasn't been pressed
+             shm_status_ptr->individual_service_mode == 1                                     // the car is in service mode
+      )
+      {
+        pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
+      }
+
+      /* act accordingly if any of these conditions change */
+      if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) != 0) // if the car needs to move up or down
+      {
+        sleep(delay_ms / 1000);
+        handle_dest_floor_change(shm_status_ptr, &delay_ms);
+      }
+      else if (shm_status_ptr->open_button == 1) // if the open button has been pressed
+      {
+        opening_doors(shm_status_ptr);
+        sleep(delay_ms / 1000);
+        open_doors(shm_status_ptr);
+        shm_status_ptr->open_button = 0;
+      }
+      else if (shm_status_ptr->close_button == 1) // if the close button has been pressed
+      {
+        closing_doors(shm_status_ptr);
+        sleep(delay_ms / 1000);
+        close_doors(shm_status_ptr);
+        shm_status_ptr->close_button = 0;
+      }
+      else if (shm_status_ptr->individual_service_mode == 0) // taken out of service mode
+      {
+        printf("Car leaving service mode\n");
+        shm_status_ptr->individual_service_mode = 0;
+      }
     }
 
     /* if the current floor is not the destination floor - it must move up or down one */
     else if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) != 0)
     {
-      /* find the direction the car must move */
-      int direction;
-      if (floor_char_to_int(shm_status_ptr->current_floor) < floor_char_to_int(shm_status_ptr->destination_floor))
-      {
-        direction = 1; // up
-      }
-      else
-      {
-        direction = -1; // down
-      }
-
-      /* now move floors */
-      move_floors(shm_status_ptr, direction, delay_ms);
+      handle_dest_floor_change(shm_status_ptr, &delay_ms);
     }
 
     pthread_mutex_unlock(&shm_status_ptr->mutex);
