@@ -36,7 +36,7 @@ void *queue_manager(void *arg)
   {
     pthread_mutex_lock(&clients_mutex);
 
-    /* wait while the client is not at its destination floor, the doors are not closed, and the queue is not empty */
+    /* wait while the client is not at its destination floor, the doors are not closed, and the queue is empty */
     while (strcmp(client->current_floor, client->destination_floor) != 0 || strcmp(client->status, "Closed") != 0 || client->queue_length == 0)
     {
       pthread_cond_wait(&client->queue_cond, &clients_mutex);
@@ -51,11 +51,17 @@ void *queue_manager(void *arg)
 
     send_message(client->fd, message);
 
+    // update the destination floor server side to prevent it from jumping the gun and sending another request
+    floor_int_to_char(client->queue[0], client->destination_floor);
+
     remove_from_queue(client);
 
     pthread_mutex_unlock(&clients_mutex);
   }
 
+  pthread_mutex_lock(&clients_mutex);
+  printf("Queue manager thread for fd %d ending\n", client->fd);
+  pthread_mutex_unlock(&clients_mutex);
   return NULL;
 }
 
@@ -68,7 +74,7 @@ void *handle_client(void *arg)
   client_t *client = (client_t *)arg;
 
   pthread_mutex_lock(&clients_mutex);
-  initialise_cond(client);
+  pthread_cond_init(&client->queue_cond, NULL);
   int fd = client->fd; // local fd variable to avoid constant mutex locks/unlocks
   client->queue = malloc(0);
   client->queue_length = 0;
@@ -119,6 +125,10 @@ void *handle_client(void *arg)
 
       /* kill the thread */
       thread_running = 0;
+    }
+    else if (strncmp(message, "INDIVIDUAL SERVICE", 18) == 0)
+    {
+      printf("Car %s is in %s\n", client->name, message);
     }
     pthread_mutex_unlock(&clients_mutex);
   }
@@ -176,7 +186,18 @@ int main(void)
     }
   }
 
+  /* free each individual client_t */
+  printf("Freeing client_t objects\n");
+  for (int index = 0; index < client_count; index++)
+  {
+    client_t *current = (client_t *)clients[index];
+    free(current->queue);
+    free(current);
+  }
+  /* and free the array of pointers to the clients array */
+  printf("Freeing the clients array\n");
   free(clients);
+  printf("Closing socket\n");
   close(serverFd);
 
   return 0;

@@ -1,4 +1,3 @@
-#include <pthread.h>
 #include <stdint.h>
 
 /* struct definitions */
@@ -18,17 +17,4 @@ typedef struct
   uint8_t emergency_mode;          // 1 if in emergency mode, else 0
 } car_shared_mem;
 
-typedef struct
-{
-  int fd;       // file descriptor of the connected server
-  int delay_ms; // the delay of the car
-  char lowest_floor[4];
-  char highest_floor[4];
-} car_thread_data;
-
-/* functions used by the car component */
-int do_shm_open(char *shm_status_name);
-void do_ftruncate(int fd, int size);
-void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor_char);
-void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms);
-void handle_dest_floor_change(car_shared_mem *shm_status_ptr, int *delay_ms);
+int verify_operation(char *operation);

@@ -46,7 +46,7 @@ int main(int argc, char **argv)
   signal(SIGINT, exit_cleanup); // Handle Ctrl+C
 
   /* open the shared memory object */
-  shm_status_fd = shm_open(shm_status_name, O_CREAT | O_RDWR, 0666);
+  shm_status_fd = shm_open(shm_status_name, O_RDWR, 0666);
   if (shm_status_fd == -1)
   {
     perror("Unable to open shared memory object");

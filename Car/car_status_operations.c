@@ -7,50 +7,36 @@
 // my functions
 #include "car_helpers.h"
 
-void opening_doors(car_thread_data *data)
+void opening_doors(car_shared_mem *shm_status_ptr)
 {
-  pthread_mutex_lock(&data->ptr->mutex);
-  strcpy(data->ptr->status, "Opening");
+  strcpy(shm_status_ptr->status, "Opening");
   printf("Opening doors\n");
-  pthread_mutex_unlock(&data->ptr->mutex);
 }
 
-void open_doors(car_thread_data *data)
+void open_doors(car_shared_mem *shm_status_ptr)
 {
-  pthread_mutex_lock(&data->ptr->mutex);
-  strcpy(data->ptr->status, "Open");
+  strcpy(shm_status_ptr->status, "Open");
   printf("Doors are open\n");
-  pthread_mutex_unlock(&data->ptr->mutex);
 }
 
-void closing_doors(car_thread_data *data)
+void closing_doors(car_shared_mem *shm_status_ptr)
 {
-  pthread_mutex_lock(&data->ptr->mutex);
-  strcpy(data->ptr->status, "Closing");
+  strcpy(shm_status_ptr->status, "Closing");
   printf("Closing doors\n");
-  pthread_mutex_unlock(&data->ptr->mutex);
 }
 
-void close_doors(car_thread_data *data)
+void close_doors(car_shared_mem *shm_status_ptr)
 {
-  pthread_mutex_lock(&data->ptr->mutex);
-  strcpy(data->ptr->status, "Closed");
+  strcpy(shm_status_ptr->status, "Closed");
   printf("Doors are closed\n");
-  pthread_mutex_unlock(&data->ptr->mutex);
 }
 
-void set_between(car_thread_data *data)
+void set_between(car_shared_mem *shm_status_ptr)
 {
-  pthread_mutex_lock(&data->ptr->mutex);
-  strcpy(data->ptr->status, "Between");
-  printf("Car is between floors\n");
-  pthread_mutex_unlock(&data->ptr->mutex);
+  strcpy(shm_status_ptr->status, "Between");
 }
 
-void get_status(car_thread_data *data, char *status)
+void get_status(car_shared_mem *shm_status_ptr, char *status)
 {
-
-  pthread_mutex_lock(&data->ptr->mutex);
-  strcpy(status, data->ptr->status);
-  pthread_mutex_unlock(&data->ptr->mutex);
+  strcpy(status, shm_status_ptr->status);
 }
