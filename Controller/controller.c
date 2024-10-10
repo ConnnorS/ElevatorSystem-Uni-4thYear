@@ -126,6 +126,10 @@ void *handle_client(void *arg)
       /* kill the thread */
       thread_running = 0;
     }
+    else if (strncmp(message, "INDIVIDUAL SERVICE", 18) == 0)
+    {
+      printf("Car %s is in %s\n", client->name, message);
+    }
     pthread_mutex_unlock(&clients_mutex);
   }
 

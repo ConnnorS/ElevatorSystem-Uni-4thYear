@@ -59,13 +59,12 @@ void *control_system_receive_handler(void *args)
 
   printf("Control system receive thread started\n");
 
-  while (system_running)
+  while (system_running && !in_service_mode)
   {
     char *message = receive_message(fd);
     if (message == NULL)
     {
       printf("Controller disconnected\n");
-      system_running = 0;
     }
     else if (strncmp(message, "FLOOR", 5) == 0)
     {
@@ -114,7 +113,7 @@ void *control_system_send_handler(void *args)
     sleep(delay_ms / 1000);
   }
 
-  while (system_running)
+  while (system_running && !in_service_mode)
   {
     /* prepare the message */
     pthread_mutex_lock(&shm_status_ptr->mutex);
@@ -126,6 +125,12 @@ void *control_system_send_handler(void *args)
 
     sleep(car->delay_ms / 1000);
   }
+
+  if (in_service_mode)
+  {
+    send_message(socketFd, "INDIVIDUAL SERVICE");
+  }
+  close(socketFd);
   printf("Send thread ending - received end message\n");
   return NULL;
 }
@@ -242,6 +247,8 @@ int main(int argc, char **argv)
       {
         printf("Car leaving service mode\n");
         shm_status_ptr->individual_service_mode = 0;
+        in_service_mode = 0;
+        pthread_create(&server_send_handler, NULL, control_system_send_handler, (void *)&thread_data); // spin up a new thread again
       }
     }
 
