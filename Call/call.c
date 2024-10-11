@@ -45,15 +45,12 @@ int main(int argc, char **argv)
   int serverFd = connect_to_control_system();
   if (serverFd == -1)
   {
-    printf("Unable to connect to elevator system\n");
     exit(1);
   }
-  printf("Connection successful\n");
 
   /* prepare and send the message */
   char message[64];
   snprintf(message, sizeof(message), "CALL %s %s", source_floor, destination_floor);
-  printf("Sending request from floor %s to floor %s\n", source_floor, destination_floor);
   send_message(serverFd, message);
 
   /* await a response */
