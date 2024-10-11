@@ -48,12 +48,18 @@ void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor
   pthread_mutexattr_t attr;
   pthread_mutexattr_init(&attr);
   pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
-  pthread_mutex_init(&shm_status_ptr->mutex, &attr);
+  if (pthread_mutex_init(&shm_status_ptr->mutex, &attr) != 0)
+  {
+    printf("Mutex init failed\n");
+  }
   // initialise the shared condition variable
   pthread_condattr_t cond_attr;
   pthread_condattr_init(&cond_attr);
   pthread_condattr_setpshared(&cond_attr, PTHREAD_PROCESS_SHARED);
-  pthread_cond_init(&shm_status_ptr->cond, &cond_attr);
+  if (pthread_cond_init(&shm_status_ptr->cond, &cond_attr) != 0)
+  {
+    printf("Cond init failed\n");
+  }
 
   strcpy(shm_status_ptr->current_floor, lowest_floor_char);
   strcpy(shm_status_ptr->destination_floor, lowest_floor_char);

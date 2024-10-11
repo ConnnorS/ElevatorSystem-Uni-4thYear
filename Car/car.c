@@ -23,6 +23,7 @@
 char *shm_status_name;
 volatile sig_atomic_t system_running = 1;
 volatile sig_atomic_t in_service_mode = 0;
+volatile sig_atomic_t in_emergency_mode = 0;
 
 car_shared_mem *shm_status_ptr;
 
@@ -59,7 +60,7 @@ void *control_system_receive_handler(void *args)
 
   printf("Control system receive thread started\n");
 
-  while (system_running && !in_service_mode)
+  while (system_running && !in_service_mode && !in_emergency_mode)
   {
     char *message = receive_message(fd);
     if (message == NULL)
@@ -113,11 +114,11 @@ void *control_system_send_handler(void *args)
     sleep(delay_ms / 1000);
   }
 
-  while (system_running && !in_service_mode)
+  while (system_running && !in_service_mode && !in_emergency_mode)
   {
     /* prepare the message */
-    pthread_mutex_lock(&shm_status_ptr->mutex);
     char status_data[64];
+    pthread_mutex_lock(&shm_status_ptr->mutex);
     snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", shm_status_ptr->status, shm_status_ptr->current_floor, shm_status_ptr->destination_floor);
     pthread_mutex_unlock(&shm_status_ptr->mutex);
     /* send the message */
@@ -129,6 +130,10 @@ void *control_system_send_handler(void *args)
   if (in_service_mode)
   {
     send_message(socketFd, "INDIVIDUAL SERVICE");
+  }
+  else if (in_emergency_mode)
+  {
+    send_message(socketFd, "EMERGENCY");
   }
   close(socketFd);
   printf("Send thread ending - received end message\n");
@@ -168,14 +173,13 @@ int main(int argc, char **argv)
   /* create the shared memory object for the car */
   shm_status_name = malloc(64);
   snprintf(shm_status_name, sizeof(shm_status_name), "/car%s", argv[1]);
+  shm_unlink(shm_status_name); // unlink previous memory just in case
   int shm_status_fd = do_shm_open(shm_status_name);
   do_ftruncate(shm_status_fd, sizeof(car_shared_mem));
-  shm_status_ptr = mmap(0, sizeof(car_shared_mem), PROT_WRITE | PROT_READ, MAP_SHARED, shm_status_fd, 0);
+  shm_status_ptr = mmap(0, sizeof(car_shared_mem), PROT_WRITE, MAP_SHARED, shm_status_fd, 0);
 
   /* add in the default values to the shared memory object */
-  pthread_mutex_lock(&shm_status_ptr->mutex);
   add_default_values(shm_status_ptr, argv[2]);
-  pthread_mutex_unlock(&shm_status_ptr->mutex);
 
   /* create the handler threads */
   car_thread_data thread_data;
@@ -194,11 +198,12 @@ int main(int argc, char **argv)
     /* wait while... */
     while (system_running &&                                                                // the system is running
            strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0 && // the car is at destination floor
-           shm_status_ptr->individual_service_mode == 0)                                    // it is not in service mode
+           shm_status_ptr->individual_service_mode == 0 &&                                  // it is not in service mode
+           shm_status_ptr->emergency_mode == 0                                              // it is not in emergency mode
+    )
     {
       pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
     }
-
     /* if placed into service mode */
     if (shm_status_ptr->individual_service_mode == 1)
     {
@@ -212,7 +217,7 @@ int main(int argc, char **argv)
       }
       strcpy(shm_status_ptr->destination_floor, shm_status_ptr->current_floor); // set the destination floor to the current floor
 
-      /* wait for technician's command while... */
+      /* wait for technician's command in service mode while... */
       while (system_running &&                                                                // system is running
              strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0 && // the car is at destination floor
              shm_status_ptr->open_button == 0 &&                                              // the open button hasn't been pressed
@@ -252,6 +257,41 @@ int main(int argc, char **argv)
       }
     }
 
+    /* if placed into emergency mode */
+    else if (shm_status_ptr->emergency_mode == 1)
+    {
+      printf("Car is in emergency mode\n");
+      in_emergency_mode = 1;
+
+      /* wait for a technician to take the car out of emergency mode and into service mode */
+      while (shm_status_ptr->open_button == 0 &&          // the open button hasn't been pressed
+             shm_status_ptr->close_button == 0 &&         // the close button hasn't been pressed
+             shm_status_ptr->individual_service_mode == 0 // the technician hasn't put the car in service mode yet
+      )
+      {
+        pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
+      }
+      if (shm_status_ptr->emergency_mode == 0)
+      {
+        printf("Car leaving emergency mode\n");
+        in_emergency_mode = 0;
+      }
+      else if (shm_status_ptr->open_button == 1) // if the open button has been pressed
+      {
+        opening_doors(shm_status_ptr);
+        sleep(delay_ms / 1000);
+        open_doors(shm_status_ptr);
+        shm_status_ptr->open_button = 0;
+      }
+      else if (shm_status_ptr->close_button == 1) // if the close button has been pressed
+      {
+        closing_doors(shm_status_ptr);
+        sleep(delay_ms / 1000);
+        close_doors(shm_status_ptr);
+        shm_status_ptr->close_button = 0;
+      }
+    }
+
     /* if the current floor is not the destination floor - it must move up or down one */
     else if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) != 0)
     {
@@ -267,6 +307,10 @@ int main(int argc, char **argv)
   to 0 with CTRL + C */
   pthread_join(server_receive_handler, NULL);
   pthread_join(server_send_handler, NULL);
+
+  pthread_mutex_destroy(&shm_status_ptr->mutex);
+  pthread_cond_destroy(&shm_status_ptr->cond);
+  printf("Destroyed mutexes and conds\n");
 
   /* do the cleanup when the threads end */
   if (shm_unlink(shm_status_name) == -1)
