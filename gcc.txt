@@ -5,3 +5,5 @@ gcc -o car car.c car_helpers.c ../common_comms.c ../type_conversions.c car_statu
 gcc -o call call.c ../common_comms.c ../type_conversions.c && ./call 2 10
 
 gcc -o internal internal.c internal_helpers.c ../type_conversions.c && ./internal one close
+
+gcc -o safety safety.c && ./safety one

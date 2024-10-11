@@ -23,6 +23,7 @@
 char *shm_status_name;
 volatile sig_atomic_t system_running = 1;
 volatile sig_atomic_t in_service_mode = 0;
+volatile sig_atomic_t in_emergency_mode = 0;
 
 car_shared_mem *shm_status_ptr;
 
@@ -59,7 +60,7 @@ void *control_system_receive_handler(void *args)
 
   printf("Control system receive thread started\n");
 
-  while (system_running && !in_service_mode)
+  while (system_running && !in_service_mode && !in_emergency_mode)
   {
     char *message = receive_message(fd);
     if (message == NULL)
@@ -113,7 +114,7 @@ void *control_system_send_handler(void *args)
     sleep(delay_ms / 1000);
   }
 
-  while (system_running && !in_service_mode)
+  while (system_running && !in_service_mode && !in_emergency_mode)
   {
     /* prepare the message */
     pthread_mutex_lock(&shm_status_ptr->mutex);
@@ -129,6 +130,10 @@ void *control_system_send_handler(void *args)
   if (in_service_mode)
   {
     send_message(socketFd, "INDIVIDUAL SERVICE");
+  }
+  else if (in_emergency_mode)
+  {
+    send_message(socketFd, "EMERGENCY");
   }
   close(socketFd);
   printf("Send thread ending - received end message\n");
@@ -168,9 +173,10 @@ int main(int argc, char **argv)
   /* create the shared memory object for the car */
   shm_status_name = malloc(64);
   snprintf(shm_status_name, sizeof(shm_status_name), "/car%s", argv[1]);
+  shm_unlink(shm_status_name); // unlink previous memory just in case
   int shm_status_fd = do_shm_open(shm_status_name);
   do_ftruncate(shm_status_fd, sizeof(car_shared_mem));
-  shm_status_ptr = mmap(0, sizeof(car_shared_mem), PROT_WRITE | PROT_READ, MAP_SHARED, shm_status_fd, 0);
+  shm_status_ptr = mmap(0, sizeof(car_shared_mem), PROT_WRITE, MAP_SHARED, shm_status_fd, 0);
 
   /* add in the default values to the shared memory object */
   pthread_mutex_lock(&shm_status_ptr->mutex);
@@ -194,7 +200,9 @@ int main(int argc, char **argv)
     /* wait while... */
     while (system_running &&                                                                // the system is running
            strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0 && // the car is at destination floor
-           shm_status_ptr->individual_service_mode == 0)                                    // it is not in service mode
+           shm_status_ptr->individual_service_mode == 0 &&                                  // it is not in service mode
+           shm_status_ptr->emergency_mode == 0                                              // it is not in emergency mode
+    )
     {
       pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
     }
@@ -212,7 +220,7 @@ int main(int argc, char **argv)
       }
       strcpy(shm_status_ptr->destination_floor, shm_status_ptr->current_floor); // set the destination floor to the current floor
 
-      /* wait for technician's command while... */
+      /* wait for technician's command in service mode while... */
       while (system_running &&                                                                // system is running
              strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0 && // the car is at destination floor
              shm_status_ptr->open_button == 0 &&                                              // the open button hasn't been pressed
@@ -250,6 +258,21 @@ int main(int argc, char **argv)
         in_service_mode = 0;
         pthread_create(&server_send_handler, NULL, control_system_send_handler, (void *)&thread_data); // spin up a new thread again
       }
+    }
+
+    /* if placed into emergency mode */
+    else if (shm_status_ptr->emergency_mode == 1)
+    {
+      printf("Car is in emergency mode\n");
+      in_emergency_mode = 1;
+
+      /* wait for a technician to take the car out of emergency mode and into service mode */
+      while (shm_status_ptr->emergency_mode == 1)
+      {
+        pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
+      }
+
+      in_emergency_mode = 0;
     }
 
     /* if the current floor is not the destination floor - it must move up or down one */

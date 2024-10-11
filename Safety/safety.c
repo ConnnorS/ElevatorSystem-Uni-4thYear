@@ -55,7 +55,7 @@ int main(int argc, char **argv)
   printf("shm open success\n");
 
   /* map the shared memory */
-  shm_status_ptr = mmap(NULL, sizeof(car_shared_mem), PROT_READ | PROT_WRITE, MAP_SHARED, shm_status_fd, 0);
+  shm_status_ptr = mmap(0, sizeof(car_shared_mem), PROT_WRITE, MAP_SHARED, shm_status_fd, 0);
   if (shm_status_ptr == MAP_FAILED)
   {
     perror("mmap failed");
@@ -68,9 +68,16 @@ int main(int argc, char **argv)
   while (1)
   {
     pthread_mutex_lock(&shm_status_ptr->mutex);
+    printf("Obstruction: %d\n", shm_status_ptr->door_obstruction);
+    printf("Emergency stop: %d\n", shm_status_ptr->emergency_stop);
+    printf("Emergency mode: %d\n", shm_status_ptr->emergency_mode);
     while (shm_status_ptr->door_obstruction == 0 && shm_status_ptr->emergency_stop == 0 && shm_status_ptr->overload == 0)
     {
-      pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
+      int res = pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
+      if (res != 0)
+      {
+        printf("Cond wait failed: %s\n", strerror(res));
+      }
     }
 
     printf("Safety system engaged!\n");
@@ -103,6 +110,7 @@ int main(int argc, char **argv)
     /* [add in here]*/
 
     pthread_mutex_unlock(&shm_status_ptr->mutex);
+    pthread_cond_broadcast(&shm_status_ptr->cond);
   }
 
   exit_cleanup(1); // Cleanup at the end (though this will never be reached)
