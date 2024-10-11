@@ -68,9 +68,6 @@ int main(int argc, char **argv)
   while (1)
   {
     pthread_mutex_lock(&shm_status_ptr->mutex);
-    printf("Obstruction: %d\n", shm_status_ptr->door_obstruction);
-    printf("Emergency stop: %d\n", shm_status_ptr->emergency_stop);
-    printf("Emergency mode: %d\n", shm_status_ptr->emergency_mode);
 
     while (shm_status_ptr->door_obstruction == 0 && shm_status_ptr->emergency_stop == 0 && shm_status_ptr->overload == 0)
     {
