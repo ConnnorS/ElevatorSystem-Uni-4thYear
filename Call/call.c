@@ -42,7 +42,6 @@ int main(int argc, char **argv)
   }
 
   /* connect to the control system */
-  printf("Attempting to connect to control system...\n");
   int serverFd = connect_to_control_system();
   if (serverFd == -1)
   {
