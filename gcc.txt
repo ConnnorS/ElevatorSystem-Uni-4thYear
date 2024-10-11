@@ -2,6 +2,8 @@ gcc -o controller controller.c controller_helpers.c ../common_comms.c ../type_co
 
 gcc -o car car.c car_helpers.c ../common_comms.c ../type_conversions.c car_status_operations.c && ./car one 1 50 1000
 
+gcc -o car car.c car_helpers.c ../common_comms.c ../type_conversions.c car_status_operations.c && ./car two 100 200 1000
+
 gcc -o call call.c ../common_comms.c ../type_conversions.c && ./call 2 10
 
 gcc -o internal internal.c internal_helpers.c ../type_conversions.c && ./internal one close

@@ -112,7 +112,7 @@ void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms)
 
     close_doors(shm_status_ptr);
   }
-  else // the car is in service mode so just close the doors
+  else if (shm_status_ptr->individual_service_mode == 1) // the car is in service mode so just close the doors
   {
     sleep(*delay_ms / 1000);
     close_doors(shm_status_ptr);

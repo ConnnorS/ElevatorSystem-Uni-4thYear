@@ -172,7 +172,7 @@ int main(int argc, char **argv)
 
   /* create the shared memory object for the car */
   shm_status_name = malloc(64);
-  snprintf(shm_status_name, sizeof(shm_status_name), "/car%s", argv[1]);
+  snprintf(shm_status_name, 64, "/car%s", argv[1]);
   shm_unlink(shm_status_name); // unlink previous memory just in case
   int shm_status_fd = do_shm_open(shm_status_name);
   do_ftruncate(shm_status_fd, sizeof(car_shared_mem));
