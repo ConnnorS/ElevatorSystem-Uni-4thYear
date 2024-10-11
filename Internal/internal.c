@@ -111,13 +111,14 @@ int main(int argc, char **argv)
     destination_int--;
     floor_int_to_char(destination_int, shm_status_ptr->destination_floor);
   }
+  /* FOR TESTING REMOVE LATER */
   else if (strcmp(operation, "emrg") == 0)
   {
     shm_status_ptr->emergency_stop = 1;
   }
 
   /* finally, signal the cond and exit */
-  pthread_cond_signal(&shm_status_ptr->cond);
+  pthread_cond_broadcast(&shm_status_ptr->cond);
   pthread_mutex_unlock(&shm_status_ptr->mutex);
 
   munmap(shm_status_ptr, sizeof(car_shared_mem));

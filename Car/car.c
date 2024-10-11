@@ -202,7 +202,6 @@ int main(int argc, char **argv)
            shm_status_ptr->emergency_mode == 0                                              // it is not in emergency mode
     )
     {
-      printf("Car waiting for next command\n");
       pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
     }
     /* if placed into service mode */
@@ -226,7 +225,6 @@ int main(int argc, char **argv)
              shm_status_ptr->individual_service_mode == 1                                     // the car is in service mode
       )
       {
-        printf("Car waiting for next technician command\n");
         pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
       }
 
@@ -266,13 +264,32 @@ int main(int argc, char **argv)
       in_emergency_mode = 1;
 
       /* wait for a technician to take the car out of emergency mode and into service mode */
-      while (shm_status_ptr->emergency_mode == 1)
+      while (shm_status_ptr->open_button == 0 &&          // the open button hasn't been pressed
+             shm_status_ptr->close_button == 0 &&         // the close button hasn't been pressed
+             shm_status_ptr->individual_service_mode == 0 // the technician hasn't put the car in service mode yet
+      )
       {
-        printf("Waiting to be taken out of emergency mode\n");
         pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
       }
-
-      in_emergency_mode = 0;
+      if (shm_status_ptr->emergency_mode == 0)
+      {
+        printf("Car leaving emergency mode\n");
+        in_emergency_mode = 0;
+      }
+      else if (shm_status_ptr->open_button == 1) // if the open button has been pressed
+      {
+        opening_doors(shm_status_ptr);
+        sleep(delay_ms / 1000);
+        open_doors(shm_status_ptr);
+        shm_status_ptr->open_button = 0;
+      }
+      else if (shm_status_ptr->close_button == 1) // if the close button has been pressed
+      {
+        closing_doors(shm_status_ptr);
+        sleep(delay_ms / 1000);
+        close_doors(shm_status_ptr);
+        shm_status_ptr->close_button = 0;
+      }
     }
 
     /* if the current floor is not the destination floor - it must move up or down one */
