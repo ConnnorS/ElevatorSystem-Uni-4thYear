@@ -71,13 +71,10 @@ int main(int argc, char **argv)
     printf("Obstruction: %d\n", shm_status_ptr->door_obstruction);
     printf("Emergency stop: %d\n", shm_status_ptr->emergency_stop);
     printf("Emergency mode: %d\n", shm_status_ptr->emergency_mode);
+
     while (shm_status_ptr->door_obstruction == 0 && shm_status_ptr->emergency_stop == 0 && shm_status_ptr->overload == 0)
     {
-      int res = pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
-      if (res != 0)
-      {
-        printf("Cond wait failed: %s\n", strerror(res));
-      }
+      pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
     }
 
     printf("Safety system engaged!\n");

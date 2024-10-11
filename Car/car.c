@@ -117,8 +117,8 @@ void *control_system_send_handler(void *args)
   while (system_running && !in_service_mode && !in_emergency_mode)
   {
     /* prepare the message */
-    pthread_mutex_lock(&shm_status_ptr->mutex);
     char status_data[64];
+    pthread_mutex_lock(&shm_status_ptr->mutex);
     snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", shm_status_ptr->status, shm_status_ptr->current_floor, shm_status_ptr->destination_floor);
     pthread_mutex_unlock(&shm_status_ptr->mutex);
     /* send the message */
@@ -179,9 +179,7 @@ int main(int argc, char **argv)
   shm_status_ptr = mmap(0, sizeof(car_shared_mem), PROT_WRITE, MAP_SHARED, shm_status_fd, 0);
 
   /* add in the default values to the shared memory object */
-  pthread_mutex_lock(&shm_status_ptr->mutex);
   add_default_values(shm_status_ptr, argv[2]);
-  pthread_mutex_unlock(&shm_status_ptr->mutex);
 
   /* create the handler threads */
   car_thread_data thread_data;
@@ -204,9 +202,9 @@ int main(int argc, char **argv)
            shm_status_ptr->emergency_mode == 0                                              // it is not in emergency mode
     )
     {
+      printf("Car waiting for next command\n");
       pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
     }
-
     /* if placed into service mode */
     if (shm_status_ptr->individual_service_mode == 1)
     {
@@ -228,6 +226,7 @@ int main(int argc, char **argv)
              shm_status_ptr->individual_service_mode == 1                                     // the car is in service mode
       )
       {
+        printf("Car waiting for next technician command\n");
         pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
       }
 
@@ -269,6 +268,7 @@ int main(int argc, char **argv)
       /* wait for a technician to take the car out of emergency mode and into service mode */
       while (shm_status_ptr->emergency_mode == 1)
       {
+        printf("Waiting to be taken out of emergency mode\n");
         pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
       }
 
@@ -290,6 +290,10 @@ int main(int argc, char **argv)
   to 0 with CTRL + C */
   pthread_join(server_receive_handler, NULL);
   pthread_join(server_send_handler, NULL);
+
+  pthread_mutex_destroy(&shm_status_ptr->mutex);
+  pthread_cond_destroy(&shm_status_ptr->cond);
+  printf("Destroyed mutexes and conds\n");
 
   /* do the cleanup when the threads end */
   if (shm_unlink(shm_status_name) == -1)
