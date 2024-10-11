@@ -109,10 +109,9 @@ int floors_are_in_range(int sourceFloor, int destinationFloor, int lowestFloor, 
 }
 
 /* finds the fd of the car which can service the floors then adds them to the queue */
-int find_car_for_floor(int *source_floor, int *destination_floor, int **clients, int client_count, char *chosen_car)
+int find_car_for_floor(int *source_floor, int *destination_floor, client_t **clients, int client_count, char *chosen_car)
 {
   int found = 0;
-
   client_t *current;
   /* find a client which can service the request */
   for (int index = 0; index < client_count; index++)
@@ -147,8 +146,7 @@ int find_car_for_floor(int *source_floor, int *destination_floor, int **clients,
     printf("\n");
 
     // signal the watching queue thread to wake up
-    int signal = pthread_cond_signal(&current->queue_cond);
-    printf("%d\n", signal);
+    pthread_cond_signal(&current->queue_cond);
   }
 
   return found;
@@ -166,4 +164,44 @@ void remove_from_queue(client_t *client)
   /* reduce the queue length and realloc memory */
   client->queue_length--;
   client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
+}
+
+void remove_client(client_t *client, client_t ***clients, int *client_count)
+{
+  if (*client_count > 1)
+  {
+    int index;
+
+    printf("Searching through %d clients\n", *client_count);
+    for (index = 0; index < *client_count; index++)
+    {
+      printf("Index: %d\n", index);
+      if ((*clients)[index] == client)
+      {
+        break;
+      }
+    }
+
+    /* if the disconnecting client is not at the end */
+    if (index < *client_count)
+    {
+      printf("Client found at index %d\n", index);
+      /* shift all the elements in the clients array to the right */
+      for (index; index < *client_count - 1; index++)
+      {
+        printf("Shifting %d <-- %d  ", index, index + 1);
+        clients[index] = clients[index + 1];
+      }
+      printf("\n");
+    }
+    *clients = realloc(*clients, sizeof(client_t *) * (*client_count - 1));
+  }
+
+  /* realloc memory */
+  *client_count = *client_count - 1;
+
+  /* finally, free the client object and associated pointers */
+  free(client->queue);
+  pthread_cond_destroy(&client->queue_cond);
+  free(client);
 }
