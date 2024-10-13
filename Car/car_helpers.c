@@ -42,7 +42,7 @@ void do_ftruncate(int fd, int size)
   }
 }
 
-void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor_char)
+void init_shared_mem(car_shared_mem *shm_status_ptr, const char *lowest_floor_char)
 {
   // initialise the shared mutex
   pthread_mutexattr_t attr;

@@ -32,7 +32,6 @@ int connect_to_control_system()
   // connect to the server
   if (connect(socketFd, (const struct sockaddr *)&addr, sizeof(addr)) == -1)
   {
-    printf("Unable to connect to elevator system.\n");
     return -1;
   }
 

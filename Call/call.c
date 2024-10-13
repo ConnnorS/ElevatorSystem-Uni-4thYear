@@ -45,6 +45,7 @@ int main(int argc, char **argv)
   int serverFd = connect_to_control_system();
   if (serverFd == -1)
   {
+    printf("Unable to connect to control system\n");
     exit(1);
   }
 

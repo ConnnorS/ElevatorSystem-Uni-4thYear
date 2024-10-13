@@ -25,6 +25,7 @@ char *name;
 volatile sig_atomic_t system_running = 1;
 volatile sig_atomic_t in_service_mode = 0;
 volatile sig_atomic_t in_emergency_mode = 0;
+volatile sig_atomic_t connection_threads_running = 1;
 
 car_shared_mem *shm_status_ptr;
 
@@ -61,12 +62,13 @@ void *control_system_receive_handler(void *args)
 
   printf("Control system receive thread started\n");
 
-  while (system_running && !in_service_mode && !in_emergency_mode)
+  while (system_running && !in_service_mode && !in_emergency_mode && connection_threads_running)
   {
     char *message = receive_message(fd);
     if (message == NULL)
     {
       printf("Controller disconnected\n");
+      connection_threads_running = 0;
     }
     else if (strncmp(message, "FLOOR", 5) == 0)
     {
@@ -78,7 +80,7 @@ void *control_system_receive_handler(void *args)
       pthread_mutex_unlock(&shm_status_ptr->mutex);
     }
   }
-  printf("Receive thread ending - received end message\n");
+  printf("Receive thread ending\n");
   return NULL;
 }
 
@@ -91,7 +93,11 @@ void *control_system_send_handler(void *args)
   int delay_ms = car->delay_ms; // local copies of the object pointer to avoid mutexes
 
   /* connect to the control system */
-  int socketFd = -1;
+  int socketFd = connect_to_control_system();
+  if (socketFd == -1)
+  {
+    printf("Unable to connect to control system.\n");
+  }
   while (socketFd == -1 && system_running)
   {
     socketFd = connect_to_control_system();
@@ -115,7 +121,7 @@ void *control_system_send_handler(void *args)
     usleep(delay_ms * 1000);
   }
 
-  while (system_running && !in_service_mode && !in_emergency_mode)
+  while (system_running && !in_service_mode && !in_emergency_mode && connection_threads_running)
   {
     /* prepare the message */
     char status_data[64];
@@ -137,7 +143,7 @@ void *control_system_send_handler(void *args)
     send_message(socketFd, "EMERGENCY");
   }
   close(socketFd);
-  printf("Send thread ending - received end message\n");
+  printf("Send thread ending\n");
   return NULL;
 }
 
@@ -184,7 +190,7 @@ int main(int argc, char **argv)
   shm_status_ptr = mmap(0, sizeof(car_shared_mem), PROT_WRITE, MAP_SHARED, shm_status_fd, 0);
 
   /* add in the default values to the shared memory object */
-  add_default_values(shm_status_ptr, argv[2]);
+  init_shared_mem(shm_status_ptr, argv[2]);
 
   /* create the handler threads */
   car_thread_data thread_data;
@@ -213,13 +219,14 @@ int main(int argc, char **argv)
     if (shm_status_ptr->individual_service_mode == 1)
     {
       printf("Car is in service mode\n");
-      in_service_mode = 1;                                // tell threads that the car is in service mode
-      if (strcmp(shm_status_ptr->status, "Between") == 0) // if status is 'Between' close the doors
+      if (strcmp(shm_status_ptr->status, "Between") == 0 && in_service_mode == 0) // if status is 'Between' close the doors on initial move into service mode
       {
         closing_doors(shm_status_ptr);
         usleep(thread_data.delay_ms * 1000);
         close_doors(shm_status_ptr);
       }
+      in_service_mode = 1; // tell threads that the car is in service mode
+
       strcpy(shm_status_ptr->destination_floor, shm_status_ptr->current_floor); // set the destination floor to the current floor
 
       /* wait for technician's command in service mode while... */

@@ -29,6 +29,6 @@ typedef struct
 /* functions used by the car component */
 int do_shm_open(char *shm_status_name);
 void do_ftruncate(int fd, int size);
-void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor_char);
+void init_shared_mem(car_shared_mem *shm_status_ptr, const char *lowest_floor_char);
 void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms);
 void handle_dest_floor_change(car_shared_mem *shm_status_ptr, int *delay_ms);
