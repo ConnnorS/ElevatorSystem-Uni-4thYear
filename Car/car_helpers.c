@@ -78,7 +78,7 @@ void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms)
   /* now set the car to between */
   set_between(shm_status_ptr);
 
-  sleep(*delay_ms / 1000);
+  usleep(*delay_ms * 1000);
 
   /* now move up or down one floor */
   int current_floor_int = floor_char_to_int(shm_status_ptr->current_floor);
@@ -97,19 +97,19 @@ void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms)
     opening_doors(shm_status_ptr);
 
     pthread_mutex_unlock(&shm_status_ptr->mutex);
-    sleep(*delay_ms / 1000);
+    usleep(*delay_ms * 1000);
     pthread_mutex_lock(&shm_status_ptr->mutex);
 
     open_doors(shm_status_ptr);
 
     pthread_mutex_unlock(&shm_status_ptr->mutex);
-    sleep(*delay_ms / 1000);
+    usleep(*delay_ms * 1000);
     pthread_mutex_lock(&shm_status_ptr->mutex);
 
     closing_doors(shm_status_ptr);
 
     pthread_mutex_unlock(&shm_status_ptr->mutex);
-    sleep(*delay_ms / 1000);
+    usleep(*delay_ms * 1000);
     pthread_mutex_lock(&shm_status_ptr->mutex);
 
     close_doors(shm_status_ptr);

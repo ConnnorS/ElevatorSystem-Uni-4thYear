@@ -95,7 +95,7 @@ void *control_system_send_handler(void *args)
   while (socketFd == -1 && system_running)
   {
     socketFd = connect_to_control_system();
-    sleep(delay_ms / 1000);
+    usleep(delay_ms * 1000);
   }
   car->fd = socketFd;
 
@@ -112,7 +112,7 @@ void *control_system_send_handler(void *args)
     {
       break;
     }
-    sleep(delay_ms / 1000);
+    usleep(delay_ms * 1000);
   }
 
   while (system_running && !in_service_mode && !in_emergency_mode)
@@ -125,7 +125,7 @@ void *control_system_send_handler(void *args)
     /* send the message */
     send_message(socketFd, (char *)status_data);
 
-    sleep(car->delay_ms / 1000);
+    usleep(car->delay_ms * 1000);
   }
 
   if (in_service_mode)
@@ -217,7 +217,7 @@ int main(int argc, char **argv)
       if (strcmp(shm_status_ptr->status, "Between") == 0) // if status is 'Between' close the doors
       {
         closing_doors(shm_status_ptr);
-        sleep(thread_data.delay_ms / 1000);
+        usleep(thread_data.delay_ms * 1000);
         close_doors(shm_status_ptr);
       }
       strcpy(shm_status_ptr->destination_floor, shm_status_ptr->current_floor); // set the destination floor to the current floor
@@ -236,20 +236,20 @@ int main(int argc, char **argv)
       /* act accordingly if any of these conditions change */
       if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) != 0) // if the car needs to move up or down
       {
-        sleep(delay_ms / 1000);
+        usleep(delay_ms * 1000);
         handle_dest_floor_change(shm_status_ptr, &delay_ms);
       }
       else if (shm_status_ptr->open_button == 1) // if the open button has been pressed
       {
         opening_doors(shm_status_ptr);
-        sleep(delay_ms / 1000);
+        usleep(delay_ms * 1000);
         open_doors(shm_status_ptr);
         shm_status_ptr->open_button = 0;
       }
       else if (shm_status_ptr->close_button == 1) // if the close button has been pressed
       {
         closing_doors(shm_status_ptr);
-        sleep(delay_ms / 1000);
+        usleep(delay_ms * 1000);
         close_doors(shm_status_ptr);
         shm_status_ptr->close_button = 0;
       }
@@ -284,14 +284,14 @@ int main(int argc, char **argv)
       else if (shm_status_ptr->open_button == 1) // if the open button has been pressed
       {
         opening_doors(shm_status_ptr);
-        sleep(delay_ms / 1000);
+        usleep(delay_ms * 1000);
         open_doors(shm_status_ptr);
         shm_status_ptr->open_button = 0;
       }
       else if (shm_status_ptr->close_button == 1) // if the close button has been pressed
       {
         closing_doors(shm_status_ptr);
-        sleep(delay_ms / 1000);
+        usleep(delay_ms * 1000);
         close_doors(shm_status_ptr);
         shm_status_ptr->close_button = 0;
       }
@@ -305,7 +305,7 @@ int main(int argc, char **argv)
 
     pthread_mutex_unlock(&shm_status_ptr->mutex);
 
-    sleep(delay_ms / 1000);
+    usleep(delay_ms * 1000);
   }
 
   /* wait for the threads to end - this will happen when system_running is set
