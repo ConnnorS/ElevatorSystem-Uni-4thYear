@@ -31,8 +31,9 @@ void closing_doors(car_shared_mem *shm_status_ptr)
 void close_doors(car_shared_mem *shm_status_ptr, int *delay_ms)
 {
   // check for obstruction
-  if (shm_status_ptr->door_obstruction)
+  while (shm_status_ptr->door_obstruction)
   {
+    printf("Door obstruction detected!\n");
     handle_obstruction(shm_status_ptr, delay_ms);
   }
 
@@ -69,6 +70,4 @@ void handle_obstruction(car_shared_mem *shm_status_ptr, int *delay_ms)
   pthread_mutex_unlock(&shm_status_ptr->mutex);
   usleep(*delay_ms * 1000);
   pthread_mutex_lock(&shm_status_ptr->mutex);
-
-  close_doors(shm_status_ptr, delay_ms);
 }

@@ -145,7 +145,9 @@ void *control_system_send_handler(void *args)
   {
     send_message(socketFd, "EMERGENCY");
   }
-  pthread_join(server_send_handler, NULL);
+
+  /* wait for the receive handler to close then close everything off */
+  pthread_join(server_receive_handler, NULL);
   close(socketFd);
   printf("Send thread ending\n");
   return NULL;
@@ -175,8 +177,8 @@ int main(int argc, char **argv)
   int delay_ms = atoi(argv[4]);
 
   /* validate the user input */
-  const int lowest_floor_int = atoi(argv[2]);
-  const int highest_floor_int = atoi(argv[3]);
+  int lowest_floor_int = atoi(argv[2]);
+  int highest_floor_int = atoi(argv[3]);
   validate_floor_range(lowest_floor_int);
   validate_floor_range(highest_floor_int);
   compare_highest_lowest(lowest_floor_int, highest_floor_int);
@@ -220,6 +222,7 @@ int main(int argc, char **argv)
     {
       pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
     }
+
     /* if placed into service mode */
     if (shm_status_ptr->individual_service_mode == 1)
     {
@@ -249,7 +252,7 @@ int main(int argc, char **argv)
       if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) != 0) // if the car needs to move up or down
       {
         usleep(delay_ms * 1000);
-        handle_dest_floor_change(shm_status_ptr, &delay_ms);
+        handle_dest_floor_change(shm_status_ptr, &delay_ms, &lowest_floor_int, &highest_floor_int);
       }
       else if (shm_status_ptr->open_button == 1) // if the open button has been pressed
       {
@@ -280,6 +283,8 @@ int main(int argc, char **argv)
       printf("Car is in emergency mode\n");
       in_emergency_mode = 1;
 
+      strcpy(shm_status_ptr->destination_floor, shm_status_ptr->current_floor); // set the destination floor to the current floor
+
       /* wait for a technician to take the car out of emergency mode and into service mode */
       while (shm_status_ptr->open_button == 0 &&          // the open button hasn't been pressed
              shm_status_ptr->close_button == 0 &&         // the close button hasn't been pressed
@@ -288,6 +293,7 @@ int main(int argc, char **argv)
       {
         pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
       }
+
       if (shm_status_ptr->emergency_mode == 0)
       {
         printf("Car leaving emergency mode\n");
@@ -312,7 +318,7 @@ int main(int argc, char **argv)
     /* if the current floor is not the destination floor - it must move up or down one */
     else if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) != 0)
     {
-      handle_dest_floor_change(shm_status_ptr, &delay_ms);
+      handle_dest_floor_change(shm_status_ptr, &delay_ms, &lowest_floor_int, &highest_floor_int);
     }
 
     /* if the controller disconnects - restart the connection threads to connect again */

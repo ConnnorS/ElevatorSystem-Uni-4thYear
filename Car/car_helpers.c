@@ -84,11 +84,6 @@ void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms)
     usleep(*delay_ms * 1000);
     pthread_mutex_lock(&shm_status_ptr->mutex);
 
-    if (shm_status_ptr->door_obstruction)
-    {
-      handle_obstruction(shm_status_ptr, delay_ms);
-    }
-
     close_doors(shm_status_ptr, delay_ms);
   }
 
@@ -141,17 +136,27 @@ void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms)
   }
 }
 
-void handle_dest_floor_change(car_shared_mem *shm_status_ptr, int *delay_ms)
+void handle_dest_floor_change(car_shared_mem *shm_status_ptr, int *delay_ms, int *lowest_floor_int, int *highest_floor_int)
 {
   /* find the direction the car must move */
-  int direction;
-  if (floor_char_to_int(shm_status_ptr->current_floor) < floor_char_to_int(shm_status_ptr->destination_floor))
+  int direction = 0;
+  int current_floor = floor_char_to_int(shm_status_ptr->current_floor);
+  int destination_floor = floor_char_to_int(shm_status_ptr->destination_floor);
+
+  if (current_floor < destination_floor)
   {
     direction = 1; // up
   }
-  else
+  else if (current_floor > destination_floor)
   {
     direction = -1; // down
+  }
+
+  /* ensure the car won't go out of bounds */
+  if (current_floor + direction < *lowest_floor_int || current_floor + direction > *highest_floor_int)
+  {
+    strcpy(shm_status_ptr->destination_floor, shm_status_ptr->current_floor);
+    return;
   }
 
   /* now move floors */

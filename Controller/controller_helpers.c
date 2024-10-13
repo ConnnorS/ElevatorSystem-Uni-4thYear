@@ -184,7 +184,7 @@ void remove_client(client_t *client, client_t ***clients, int *client_count)
     if (index < *client_count)
     {
       /* shift all the elements in the clients array to the right */
-      for (index; index < *client_count - 1; index++)
+      for (index = index; index < *client_count - 1; index++)
       {
         clients[index] = clients[index + 1];
       }

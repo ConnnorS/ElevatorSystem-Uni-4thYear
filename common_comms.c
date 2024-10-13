@@ -5,6 +5,9 @@
 // networks
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <fcntl.h>
+// systems
+#include <sys/select.h>
 
 /* simple function to set up a TCP connection with the controller
 then return an int which is the socketFd */

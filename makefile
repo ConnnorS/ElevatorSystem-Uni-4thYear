@@ -30,7 +30,7 @@ internal: $(INTERNAL_SRC)
 # --- SAFETY COMPONENT ---- #
 SAFETY_SRC = ./Safety/safety.c
 safety: $(SAFETY_SRC)
-	$(CC) -o safety $(INTERNAL_SRC) $(FLAGS)
+	$(CC) -o safety $(SAFETY_SRC) $(FLAGS)
 
 clean:
 	rm -f $(FILES)

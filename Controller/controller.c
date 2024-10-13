@@ -11,6 +11,8 @@
 // networks
 #include <arpa/inet.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
+#include <sys/socket.h>
 // signal
 #include <signal.h>
 // header file
@@ -160,7 +162,7 @@ void *handle_client(void *arg)
   pthread_mutex_unlock(&clients_mutex);
 
   printf("fd %d handler thread ending\n", fd);
-
+  close(fd);
   return NULL;
 }
 
@@ -177,8 +179,10 @@ int main(void)
   clients = malloc(0);
   client_count = 0;
 
-  /* startup the server */
+  /* startup the server and make non-blocking */
   int serverFd = create_server();
+  int flags = fcntl(serverFd, F_GETFL, 0);
+  fcntl(serverFd, F_SETFL, flags | O_NONBLOCK);
 
   struct sockaddr clientaddr;
   socklen_t clientaddr_len;
@@ -206,11 +210,6 @@ int main(void)
       /* create the handler thread */
       pthread_t client_handler_thread;
       pthread_create(&client_handler_thread, NULL, handle_client, new_client);
-    }
-    else
-    {
-      printf("Max clients reached. Connection rejected\n");
-      close(new_socket);
     }
   }
 
