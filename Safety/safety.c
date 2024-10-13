@@ -74,21 +74,16 @@ int main(int argc, char **argv)
       pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
     }
 
-    printf("Safety system engaged!\n");
-
     /* obstruction while doors opening */
     if (shm_status_ptr->door_obstruction == 1 && strcmp(shm_status_ptr->status, "CLOSING") == 0)
     {
       printf("Door obstructed while closing\n");
-      printf("Opening doors...\n");
-      strcpy(shm_status_ptr->status, "OPENING");
       shm_status_ptr->door_obstruction = 0;
     }
     /* emergency stop */
     else if (shm_status_ptr->emergency_stop == 1 && shm_status_ptr->emergency_mode == 0)
     {
       printf("The emergency stop button has been pressed!\n");
-      printf("Entering emergency mode\n");
       shm_status_ptr->emergency_mode = 1;
       shm_status_ptr->emergency_stop = 0;
     }
@@ -96,7 +91,6 @@ int main(int argc, char **argv)
     else if (shm_status_ptr->overload == 1 && shm_status_ptr->emergency_mode == 0)
     {
       printf("The overload sensor has been tripped!\n");
-      printf("Entering emergency mode\n");
       shm_status_ptr->emergency_mode = 1;
       shm_status_ptr->overload = 0;
     }
