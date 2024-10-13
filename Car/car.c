@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 // threads
 #include <pthread.h>
 // shared memory
@@ -26,6 +27,7 @@ volatile sig_atomic_t system_running = 1;
 volatile sig_atomic_t in_service_mode = 0;
 volatile sig_atomic_t in_emergency_mode = 0;
 volatile sig_atomic_t controller_connected = 1;
+volatile sig_atomic_t new_floor_message = 0;
 
 car_shared_mem *shm_status_ptr;
 
@@ -79,6 +81,7 @@ void *control_system_receive_handler(void *args)
       sscanf(message, "%*s %s", floor_num);
       pthread_mutex_lock(&shm_status_ptr->mutex);
       strcpy(shm_status_ptr->destination_floor, floor_num);
+      new_floor_message = 1;
       pthread_cond_broadcast(&shm_status_ptr->cond);
       pthread_mutex_unlock(&shm_status_ptr->mutex);
     }
@@ -134,7 +137,19 @@ void *control_system_send_handler(void *args)
     /* send the message */
     send_message(socketFd, (char *)status_data);
 
-    usleep(car->delay_ms * 1000);
+    /* wait for status update with a timeout */
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += delay_ms / 1000;
+    ts.tv_nsec += (delay_ms % 1000) * 1000000;
+    if (ts.tv_nsec >= 1000000000)
+    {
+      ts.tv_sec += 1;
+      ts.tv_nsec -= 1000000000;
+    }
+    pthread_mutex_lock(&shm_status_ptr->mutex);
+    pthread_cond_timedwait(&shm_status_ptr->cond, &shm_status_ptr->mutex, &ts);
+    pthread_mutex_unlock(&shm_status_ptr->mutex);
   }
 
   if (in_service_mode)
@@ -168,17 +183,11 @@ int main(int argc, char **argv)
   strcpy(lowest_floor, argv[2]);
   strcpy(highest_floor, argv[3]);
 
-  // convert the basement floors to a negative number for easier comparison
-  if (argv[2][0] == 'B')
-    argv[2][0] = '-';
-  if (argv[3][0] == 'B')
-    argv[3][0] = '-';
-
   int delay_ms = atoi(argv[4]);
 
   /* validate the user input */
-  int lowest_floor_int = atoi(argv[2]);
-  int highest_floor_int = atoi(argv[3]);
+  int lowest_floor_int = floor_char_to_int(argv[2]);
+  int highest_floor_int = floor_char_to_int(argv[3]);
   validate_floor_range(lowest_floor_int);
   validate_floor_range(highest_floor_int);
   compare_highest_lowest(lowest_floor_int, highest_floor_int);
@@ -214,11 +223,13 @@ int main(int argc, char **argv)
 
     /* wait while... */
     while (system_running &&                                                                // the system is running
-           strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0 && // the car is at destination floor
+           !new_floor_message &&                                                            // there is no new floor message
+           strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0 && // the car is at its destination floor
            !shm_status_ptr->individual_service_mode &&                                      // it is not in service mode
            !shm_status_ptr->emergency_mode &&                                               // it is not in emergency mode
-           controller_connected                                                             // the controller is still connected
-    )
+           controller_connected &&                                                          // the controller is still connected
+           shm_status_ptr->open_button == 0 &&                                              // open button hasn't been pressed
+           shm_status_ptr->close_button == 0)                                               // close button hasn't been pressed
     {
       pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
     }
@@ -315,8 +326,8 @@ int main(int argc, char **argv)
       }
     }
 
-    /* if the current floor is not the destination floor - it must move up or down one */
-    else if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) != 0)
+    /* if the current floor is not the destination floor or there is a new floor message */
+    else if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) != 0 || new_floor_message)
     {
       handle_dest_floor_change(shm_status_ptr, &delay_ms, &lowest_floor_int, &highest_floor_int);
     }
@@ -329,9 +340,64 @@ int main(int argc, char **argv)
       pthread_create(&server_send_handler, NULL, control_system_send_handler, (void *)&thread_data); // spin up a new thread again
     }
 
-    pthread_mutex_unlock(&shm_status_ptr->mutex);
+    /* if the open button is pressed */
+    else if (shm_status_ptr->open_button == 1)
+    {
+      shm_status_ptr->open_button = 0;
 
-    usleep(delay_ms * 1000);
+      if (strcmp(shm_status_ptr->status, "Open") == 0)
+      {
+        pthread_mutex_unlock(&shm_status_ptr->mutex);
+        usleep(delay_ms * 1000);
+        pthread_mutex_lock(&shm_status_ptr->mutex);
+
+        closing_doors(shm_status_ptr);
+
+        pthread_mutex_unlock(&shm_status_ptr->mutex);
+        usleep(delay_ms * 1000);
+        pthread_mutex_lock(&shm_status_ptr->mutex);
+
+        close_doors(shm_status_ptr, &delay_ms);
+      }
+      else if (strcmp(shm_status_ptr->status, "Closing") == 0 || strcmp(shm_status_ptr->status, "Closed") == 0)
+      {
+        opening_doors(shm_status_ptr);
+
+        pthread_mutex_unlock(&shm_status_ptr->mutex);
+        usleep(delay_ms * 1000);
+        pthread_mutex_lock(&shm_status_ptr->mutex);
+
+        open_doors(shm_status_ptr);
+
+        pthread_mutex_unlock(&shm_status_ptr->mutex);
+        usleep(delay_ms * 1000);
+        pthread_mutex_lock(&shm_status_ptr->mutex);
+
+        closing_doors(shm_status_ptr);
+
+        pthread_mutex_unlock(&shm_status_ptr->mutex);
+        usleep(delay_ms * 1000);
+        pthread_mutex_lock(&shm_status_ptr->mutex);
+
+        close_doors(shm_status_ptr, &delay_ms);
+      }
+    }
+
+    /* if the close button is pressed and the doors are open */
+    else if (shm_status_ptr->close_button == 1 && strcmp(shm_status_ptr->status, "Open") == 0)
+    {
+      shm_status_ptr->close_button = 0;
+
+      closing_doors(shm_status_ptr);
+
+      pthread_mutex_unlock(&shm_status_ptr->mutex);
+      usleep(delay_ms * 1000);
+      pthread_mutex_lock(&shm_status_ptr->mutex);
+
+      close_doors(shm_status_ptr, &delay_ms);
+    }
+
+    pthread_mutex_unlock(&shm_status_ptr->mutex);
   }
 
   /* wait for the threads to end - this will happen when system_running is set

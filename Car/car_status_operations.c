@@ -13,19 +13,19 @@ void handle_obstruction(car_shared_mem *shm_status_ptr, int *delay_ms);
 void opening_doors(car_shared_mem *shm_status_ptr)
 {
   strcpy(shm_status_ptr->status, "Opening");
-  printf("Opening doors\n");
+  pthread_cond_broadcast(&shm_status_ptr->cond);
 }
 
 void open_doors(car_shared_mem *shm_status_ptr)
 {
   strcpy(shm_status_ptr->status, "Open");
-  printf("Doors are open\n");
+  pthread_cond_broadcast(&shm_status_ptr->cond);
 }
 
 void closing_doors(car_shared_mem *shm_status_ptr)
 {
   strcpy(shm_status_ptr->status, "Closing");
-  printf("Closing doors\n");
+  pthread_cond_broadcast(&shm_status_ptr->cond);
 }
 
 void close_doors(car_shared_mem *shm_status_ptr, int *delay_ms)
@@ -33,17 +33,17 @@ void close_doors(car_shared_mem *shm_status_ptr, int *delay_ms)
   // check for obstruction
   while (shm_status_ptr->door_obstruction)
   {
-    printf("Door obstruction detected!\n");
     handle_obstruction(shm_status_ptr, delay_ms);
   }
 
   strcpy(shm_status_ptr->status, "Closed");
-  printf("Doors are closed\n");
+  pthread_cond_broadcast(&shm_status_ptr->cond);
 }
 
 void set_between(car_shared_mem *shm_status_ptr)
 {
   strcpy(shm_status_ptr->status, "Between");
+  pthread_cond_broadcast(&shm_status_ptr->cond);
 }
 
 void get_status(car_shared_mem *shm_status_ptr, char *status)
