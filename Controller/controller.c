@@ -157,7 +157,6 @@ void *handle_client(void *arg)
   printf("fd %d handler thread cleaning up\n", fd);
   pthread_mutex_lock(&clients_mutex);
   remove_client(client, &clients, &client_count);
-  printf("Client count is now %d\n", client_count);
   pthread_mutex_unlock(&clients_mutex);
 
   printf("fd %d handler thread ending\n", fd);

@@ -21,6 +21,7 @@
 
 /* global variables */
 char *shm_status_name;
+char *name;
 volatile sig_atomic_t system_running = 1;
 volatile sig_atomic_t in_service_mode = 0;
 volatile sig_atomic_t in_emergency_mode = 0;
@@ -103,7 +104,7 @@ void *control_system_send_handler(void *args)
 
   /* send the initial identification message */
   char car_data[64];
-  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", shm_status_name, car->lowest_floor, car->highest_floor);
+  snprintf(car_data, sizeof(car_data), "CAR %s %s %s", name, car->lowest_floor, car->highest_floor);
   printf("Sending identification message...\n");
   while (system_running)
   {
@@ -169,6 +170,10 @@ int main(int argc, char **argv)
   validate_floor_range(lowest_floor_int);
   validate_floor_range(highest_floor_int);
   compare_highest_lowest(lowest_floor_int, highest_floor_int);
+
+  /* save the name of the car */
+  name = malloc(64);
+  strcpy(name, argv[1]);
 
   /* create the shared memory object for the car */
   shm_status_name = malloc(64);
@@ -319,6 +324,7 @@ int main(int argc, char **argv)
   }
 
   free(shm_status_name);
+  free(name);
 
   printf("Unlinked and freed memory\n");
 

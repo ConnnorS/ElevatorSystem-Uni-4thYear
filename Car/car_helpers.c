@@ -78,6 +78,8 @@ void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms)
   /* now set the car to between */
   set_between(shm_status_ptr);
 
+  sleep(*delay_ms / 1000);
+
   /* now move up or down one floor */
   int current_floor_int = floor_char_to_int(shm_status_ptr->current_floor);
   current_floor_int += direction;
@@ -110,11 +112,6 @@ void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms)
     sleep(*delay_ms / 1000);
     pthread_mutex_lock(&shm_status_ptr->mutex);
 
-    close_doors(shm_status_ptr);
-  }
-  else if (shm_status_ptr->individual_service_mode == 1) // the car is in service mode so just close the doors
-  {
-    sleep(*delay_ms / 1000);
     close_doors(shm_status_ptr);
   }
 }
