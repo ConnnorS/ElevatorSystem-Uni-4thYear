@@ -25,7 +25,7 @@ char *name;
 volatile sig_atomic_t system_running = 1;
 volatile sig_atomic_t in_service_mode = 0;
 volatile sig_atomic_t in_emergency_mode = 0;
-volatile sig_atomic_t connection_threads_running = 1;
+volatile sig_atomic_t controller_connected = 1;
 
 car_shared_mem *shm_status_ptr;
 
@@ -62,13 +62,16 @@ void *control_system_receive_handler(void *args)
 
   printf("Control system receive thread started\n");
 
-  while (system_running && !in_service_mode && !in_emergency_mode && connection_threads_running)
+  while (system_running && !in_service_mode && !in_emergency_mode && controller_connected)
   {
     char *message = receive_message(fd);
     if (message == NULL)
     {
       printf("Controller disconnected\n");
-      connection_threads_running = 0;
+      controller_connected = 0;
+      pthread_mutex_lock(&shm_status_ptr->mutex);
+      pthread_cond_broadcast(&shm_status_ptr->cond); // tell the main car thread that the controller has disconnected and to restart the connection threads
+      pthread_mutex_unlock(&shm_status_ptr->mutex);
     }
     else if (strncmp(message, "FLOOR", 5) == 0)
     {
@@ -121,7 +124,7 @@ void *control_system_send_handler(void *args)
     usleep(delay_ms * 1000);
   }
 
-  while (system_running && !in_service_mode && !in_emergency_mode && connection_threads_running)
+  while (system_running && !in_service_mode && !in_emergency_mode && controller_connected)
   {
     /* prepare the message */
     char status_data[64];
@@ -142,6 +145,7 @@ void *control_system_send_handler(void *args)
   {
     send_message(socketFd, "EMERGENCY");
   }
+  pthread_join(server_send_handler, NULL);
   close(socketFd);
   printf("Send thread ending\n");
   return NULL;
@@ -209,8 +213,9 @@ int main(int argc, char **argv)
     /* wait while... */
     while (system_running &&                                                                // the system is running
            strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0 && // the car is at destination floor
-           shm_status_ptr->individual_service_mode == 0 &&                                  // it is not in service mode
-           shm_status_ptr->emergency_mode == 0                                              // it is not in emergency mode
+           !shm_status_ptr->individual_service_mode &&                                      // it is not in service mode
+           !shm_status_ptr->emergency_mode &&                                               // it is not in emergency mode
+           controller_connected                                                             // the controller is still connected
     )
     {
       pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
@@ -223,7 +228,7 @@ int main(int argc, char **argv)
       {
         closing_doors(shm_status_ptr);
         usleep(thread_data.delay_ms * 1000);
-        close_doors(shm_status_ptr);
+        close_doors(shm_status_ptr, &delay_ms);
       }
       in_service_mode = 1; // tell threads that the car is in service mode
 
@@ -257,7 +262,7 @@ int main(int argc, char **argv)
       {
         closing_doors(shm_status_ptr);
         usleep(delay_ms * 1000);
-        close_doors(shm_status_ptr);
+        close_doors(shm_status_ptr, &delay_ms);
         shm_status_ptr->close_button = 0;
       }
       else if (shm_status_ptr->individual_service_mode == 0) // taken out of service mode
@@ -299,7 +304,7 @@ int main(int argc, char **argv)
       {
         closing_doors(shm_status_ptr);
         usleep(delay_ms * 1000);
-        close_doors(shm_status_ptr);
+        close_doors(shm_status_ptr, &delay_ms);
         shm_status_ptr->close_button = 0;
       }
     }
@@ -308,6 +313,14 @@ int main(int argc, char **argv)
     else if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) != 0)
     {
       handle_dest_floor_change(shm_status_ptr, &delay_ms);
+    }
+
+    /* if the controller disconnects - restart the connection threads to connect again */
+    else if (!controller_connected)
+    {
+      pthread_join(server_send_handler, NULL);
+      controller_connected = 1;
+      pthread_create(&server_send_handler, NULL, control_system_send_handler, (void *)&thread_data); // spin up a new thread again
     }
 
     pthread_mutex_unlock(&shm_status_ptr->mutex);

@@ -116,6 +116,14 @@ int main(int argc, char **argv)
   {
     shm_status_ptr->emergency_stop = 1;
   }
+  else if (strcmp(operation, "obs_on") == 0)
+  {
+    shm_status_ptr->door_obstruction = 1;
+  }
+  else if (strcmp(operation, "obs_off") == 0)
+  {
+    shm_status_ptr->door_obstruction = 0;
+  }
 
   /* finally, signal the cond and exit */
   pthread_cond_broadcast(&shm_status_ptr->cond);
