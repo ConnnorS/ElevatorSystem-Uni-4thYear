@@ -102,13 +102,19 @@ int main(int argc, char **argv)
   else if (strcmp(operation, "up") == 0)
   {
     int destination_int = floor_char_to_int(shm_status_ptr->destination_floor);
-    destination_int++;
+    do
+    {
+      destination_int++;
+    } while (destination_int == 0);
     floor_int_to_char(destination_int, shm_status_ptr->destination_floor);
   }
   else if (strcmp(operation, "down") == 0)
   {
     int destination_int = floor_char_to_int(shm_status_ptr->destination_floor);
-    destination_int--;
+    do
+    {
+      destination_int--;
+    } while (destination_int == 0);
     floor_int_to_char(destination_int, shm_status_ptr->destination_floor);
   }
   /* FOR TESTING REMOVE LATER */

@@ -27,7 +27,6 @@ volatile sig_atomic_t system_running = 1;
 volatile sig_atomic_t in_service_mode = 0;
 volatile sig_atomic_t in_emergency_mode = 0;
 volatile sig_atomic_t controller_connected = 1;
-volatile sig_atomic_t new_floor_message = 0;
 
 car_shared_mem *shm_status_ptr;
 
@@ -81,7 +80,6 @@ void *control_system_receive_handler(void *args)
       sscanf(message, "%*s %s", floor_num);
       pthread_mutex_lock(&shm_status_ptr->mutex);
       strcpy(shm_status_ptr->destination_floor, floor_num);
-      new_floor_message = 1;
       pthread_cond_broadcast(&shm_status_ptr->cond);
       pthread_mutex_unlock(&shm_status_ptr->mutex);
     }
@@ -223,7 +221,6 @@ int main(int argc, char **argv)
 
     /* wait while... */
     while (system_running &&                                                                // the system is running
-           !new_floor_message &&                                                            // there is no new floor message
            strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0 && // the car is at its destination floor
            !shm_status_ptr->individual_service_mode &&                                      // it is not in service mode
            !shm_status_ptr->emergency_mode &&                                               // it is not in emergency mode
@@ -326,8 +323,8 @@ int main(int argc, char **argv)
       }
     }
 
-    /* if the current floor is not the destination floor or there is a new floor message */
-    else if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) != 0 || new_floor_message)
+    /* if the current floor is not the destination floor */
+    else if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) != 0)
     {
       handle_dest_floor_change(shm_status_ptr, &delay_ms, &lowest_floor_int, &highest_floor_int);
     }
