@@ -35,13 +35,12 @@ int main(int argc, char **argv)
   if (argc != 2)
   {
     printf("Usage: {car name}\n");
-    exit(1);
+    return 1;
   }
 
   /* confirm the safety system and name */
   char shm_status_name[64];
   snprintf(shm_status_name, sizeof(shm_status_name), "/car%s", argv[1]);
-  printf("Safety system initialized for %s\n", shm_status_name);
 
   signal(SIGINT, exit_cleanup); // Handle Ctrl+C
 
@@ -49,8 +48,8 @@ int main(int argc, char **argv)
   shm_status_fd = shm_open(shm_status_name, O_RDWR, 0666);
   if (shm_status_fd == -1)
   {
-    perror("Unable to open shared memory object");
-    exit(1);
+    printf("Unable to acces car %s\n", argv[1]);
+    return 1;
   }
   printf("shm open success\n");
 
@@ -69,15 +68,19 @@ int main(int argc, char **argv)
   {
     pthread_mutex_lock(&shm_status_ptr->mutex);
 
-    while (shm_status_ptr->door_obstruction == 0 && shm_status_ptr->emergency_stop == 0 && shm_status_ptr->overload == 0)
+    /* wait while ... */
+    while (shm_status_ptr->door_obstruction == 0 && // there is no door obstruction
+           shm_status_ptr->emergency_stop == 0 &&   // emergency stop hasn't been pressed
+           shm_status_ptr->overload == 0            // the overload sensor hasn't been tripped
+    )
     {
       pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
     }
 
     /* obstruction while doors opening */
-    if (shm_status_ptr->door_obstruction == 1 && strcmp(shm_status_ptr->status, "CLOSING") == 0)
+    if (shm_status_ptr->door_obstruction == 1 && strcmp(shm_status_ptr->status, "Closing") == 0)
     {
-      printf("Door obstructed while closing\n");
+      strcpy(shm_status_ptr->status, "Opening\n");
       shm_status_ptr->door_obstruction = 0;
     }
     /* emergency stop */
