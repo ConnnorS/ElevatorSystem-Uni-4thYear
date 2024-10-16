@@ -38,6 +38,7 @@ for_testing:
 	mv $(FILES) ./test
 	make -C /home/cab403/CAB403-A2---Major-Project/test
 
+# ---- CLEAN EVERYTHING ---- #
 clean:
 	rm -f $(FILES)
 	rm -f /home/cab403/CAB403-A2---Major-Project/test/car \
