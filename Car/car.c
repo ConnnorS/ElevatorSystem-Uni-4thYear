@@ -186,7 +186,8 @@ int main(int argc, char **argv)
   /* validate the user input */
   int lowest_floor_int = floor_char_to_int(argv[2]);
   int highest_floor_int = floor_char_to_int(argv[3]);
-  if (validate_floor_range(lowest_floor_int) == -1 || validate_floor_range(highest_floor_int) == -1) {
+  if (validate_floor_range(lowest_floor_int) == -1 || validate_floor_range(highest_floor_int) == -1)
+  {
     printf("Invalid floor(s) specified\n");
     exit(1);
   }
@@ -232,6 +233,8 @@ int main(int argc, char **argv)
     {
       pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
     }
+
+    printf("Car status: %s\n", shm_status_ptr->status);
 
     /* if placed into service mode */
     if (shm_status_ptr->individual_service_mode == 1)

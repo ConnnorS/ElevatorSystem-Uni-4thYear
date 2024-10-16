@@ -12,6 +12,7 @@
     "string_view": "c",
     "mman.h": "c",
     "stdint.h": "c",
-    "type_conversions.h": "c"
+    "type_conversions.h": "c",
+    "typeinfo": "cpp"
   }
 }

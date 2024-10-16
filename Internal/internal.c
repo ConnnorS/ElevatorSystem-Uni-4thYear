@@ -29,7 +29,7 @@ int main(int argc, char **argv)
 
   if (verify_operation((char *)operation) == 0)
   {
-    printf("Invalid operation specified\nPlease enter \"open\", \"close\", \"stop\", \"service_on\", \"service_off\", \"up\", or \"down\"\n");
+    printf("Invalid operation\n");
     exit(1);
   }
 
@@ -37,7 +37,7 @@ int main(int argc, char **argv)
   int shm_status_fd = shm_open(shm_status_name, O_RDWR, 0666);
   if (shm_status_fd == -1)
   {
-    printf("Unable to access %s\n", shm_status_name);
+    printf("Unable to access car %s.\n", argv[1]);
     exit(1);
   }
 
@@ -61,6 +61,14 @@ int main(int argc, char **argv)
     exit(1);
   }
 
+    /* if the up or down command is entered but the car is moving */
+  if ((strcmp(operation, "up") == 0 || strcmp(operation, "down") == 0) && strcmp(shm_status_ptr->status, "Between") == 0)
+  {
+    printf("Operation not allowed while elevator is moving.\n");
+    pthread_mutex_unlock(&shm_status_ptr->mutex);
+    exit(1);
+  }
+
   /* if the up or down command is entered by the doors aren't closed */
   if ((strcmp(operation, "up") == 0 || strcmp(operation, "down") == 0) && strcmp(shm_status_ptr->status, "Closed") != 0)
   {
@@ -69,52 +77,44 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  /* if the up or down command is entered but the car is moving */
-  if ((strcmp(operation, "up") == 0 || strcmp(operation, "down") == 0) && strcmp(shm_status_ptr->status, "Between") == 0)
-  {
-    printf("Operation not allowed while elevator is moving.\n");
-    pthread_mutex_unlock(&shm_status_ptr->mutex);
-    exit(1);
-  }
-
   /* check which operation was entered and take appropriate action */
-  if (strcmp(operation, "open") == 0)
+  if (strcmp(operation, "open") == 0) // open button
   {
     shm_status_ptr->open_button = 1;
   }
-  else if (strcmp(operation, "close") == 0)
+  else if (strcmp(operation, "close") == 0) // close button
   {
     shm_status_ptr->close_button = 1;
   }
-  else if (strcmp(operation, "stop") == 0)
+  else if (strcmp(operation, "stop") == 0) // emergency stop
   {
     shm_status_ptr->emergency_stop = 1;
   }
-  else if (strcmp(operation, "service_on") == 0)
+  else if (strcmp(operation, "service_on") == 0) // service mode on
   {
     shm_status_ptr->individual_service_mode = 1;
     shm_status_ptr->emergency_mode = 0;
   }
-  else if (strcmp(operation, "service_off") == 0)
+  else if (strcmp(operation, "service_off") == 0) // service mode off
   {
     shm_status_ptr->individual_service_mode = 0;
   }
-  else if (strcmp(operation, "up") == 0)
+  else if (strcmp(operation, "up") == 0) // move up one floor
   {
     int destination_int = floor_char_to_int(shm_status_ptr->destination_floor);
     do
     {
       destination_int++;
-    } while (destination_int == 0);
+    } while (destination_int == 0); // ensure the floor does not hit 0
     floor_int_to_char(destination_int, shm_status_ptr->destination_floor);
   }
-  else if (strcmp(operation, "down") == 0)
+  else if (strcmp(operation, "down") == 0) // move down one floor
   {
     int destination_int = floor_char_to_int(shm_status_ptr->destination_floor);
     do
     {
       destination_int--;
-    } while (destination_int == 0);
+    } while (destination_int == 0); // ensure the floor does not hit 0
     floor_int_to_char(destination_int, shm_status_ptr->destination_floor);
   }
   /* FOR TESTING REMOVE LATER */

@@ -101,7 +101,6 @@ void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms)
   {
     current_floor_int += direction;
   }
-  close_doors(shm_status_ptr, delay_ms);
   floor_int_to_char(current_floor_int, shm_status_ptr->current_floor);
   pthread_cond_broadcast(&shm_status_ptr->cond);
 
