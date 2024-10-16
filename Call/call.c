@@ -14,8 +14,7 @@
 #include "../common_comms.h"
 #include "../type_conversions.h"
 
-/* expect CL-arguments
-{source floor} {destination floor} */
+/* {source floor} {destination floor} */
 int main(int argc, char **argv)
 {
   /* check user input */
@@ -32,9 +31,14 @@ int main(int argc, char **argv)
 
   /* validate floor ranges */
   int source_floor_int = floor_char_to_int(source_floor);
-  validate_floor_range(source_floor_int);
   int destination_floor_int = floor_char_to_int(destination_floor);
-  validate_floor_range(destination_floor_int);
+
+  if (validate_floor_range(source_floor_int) == -1 || validate_floor_range(destination_floor_int) == -1)
+  {
+    printf("Invalid floor(s) specified\n");
+    exit(1);
+  }
+
   if (strcmp(source_floor, destination_floor) == 0)
   {
     printf("You are already on that floor!\n");
@@ -45,7 +49,7 @@ int main(int argc, char **argv)
   int serverFd = connect_to_control_system();
   if (serverFd == -1)
   {
-    printf("Unable to connect to control system\n");
+    printf("Unable to connect to elevator system\n");
     exit(1);
   }
 

@@ -25,23 +25,13 @@ void floor_int_to_char(int floor, char *floorChar)
   }
 }
 
-void validate_floor_range(int floor)
+int validate_floor_range(int floor)
 {
-  if (floor < -99)
+  if (floor < -99 || floor > 999 || floor == 0)
   {
-    printf("Invalid floor(s) specified.\n");
-    exit(1);
+    return -1;
   }
-  else if (floor > 999)
-  {
-    printf("Invalid floor(s) specified.\n");
-    exit(1);
-  }
-  else if (floor == 0)
-  {
-    printf("Invalid floor(s) specified.\n");
-    exit(1);
-  }
+  return 1;
 }
 
 void compare_highest_lowest(int lowest, int highest)

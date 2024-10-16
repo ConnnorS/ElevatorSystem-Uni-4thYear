@@ -186,8 +186,10 @@ int main(int argc, char **argv)
   /* validate the user input */
   int lowest_floor_int = floor_char_to_int(argv[2]);
   int highest_floor_int = floor_char_to_int(argv[3]);
-  validate_floor_range(lowest_floor_int);
-  validate_floor_range(highest_floor_int);
+  if (validate_floor_range(lowest_floor_int) == -1 || validate_floor_range(highest_floor_int) == -1) {
+    printf("Invalid floor(s) specified\n");
+    exit(1);
+  }
   compare_highest_lowest(lowest_floor_int, highest_floor_int);
 
   /* save the name of the car */
