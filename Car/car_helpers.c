@@ -78,13 +78,13 @@ void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms)
   /* if the doors are open, close them */
   if (strcmp(shm_status_ptr->status, "Open") == 0)
   {
-    closing_doors(shm_status_ptr);
+    closing_doors(shm_status_ptr, delay_ms);
 
     pthread_mutex_unlock(&shm_status_ptr->mutex);
     usleep(*delay_ms * 1000);
     pthread_mutex_lock(&shm_status_ptr->mutex);
 
-    close_doors(shm_status_ptr, delay_ms);
+    close_doors(shm_status_ptr);
   }
 
   /* now set the car to between */
@@ -107,29 +107,7 @@ void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms)
   /* if the car hits the destination floor - open and close the doors only if not in service mode */
   if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0 && shm_status_ptr->individual_service_mode == 0)
   {
-    opening_doors(shm_status_ptr);
-
-    pthread_mutex_unlock(&shm_status_ptr->mutex);
-    usleep(*delay_ms * 1000);
-    pthread_mutex_lock(&shm_status_ptr->mutex);
-
-    open_doors(shm_status_ptr);
-
-    pthread_mutex_unlock(&shm_status_ptr->mutex);
-    usleep(*delay_ms * 1000);
-    pthread_mutex_lock(&shm_status_ptr->mutex);
-
-    closing_doors(shm_status_ptr);
-
-    pthread_mutex_unlock(&shm_status_ptr->mutex);
-    usleep(*delay_ms * 1000);
-    pthread_mutex_lock(&shm_status_ptr->mutex);
-
-    close_doors(shm_status_ptr, delay_ms);
-
-    pthread_mutex_unlock(&shm_status_ptr->mutex);
-    usleep(*delay_ms * 1000);
-    pthread_mutex_lock(&shm_status_ptr->mutex);
+    door_open_close(shm_status_ptr, delay_ms, shm_status_ptr->door_obstruction);
   }
 }
 
@@ -159,26 +137,7 @@ void handle_dest_floor_change(car_shared_mem *shm_status_ptr, int *delay_ms, int
   /* if the car has been sent the floor it's on */
   if (direction == 0)
   {
-    opening_doors(shm_status_ptr);
-
-    pthread_mutex_unlock(&shm_status_ptr->mutex);
-    usleep(*delay_ms * 1000);
-    pthread_mutex_lock(&shm_status_ptr->mutex);
-
-    open_doors(shm_status_ptr);
-
-    pthread_mutex_unlock(&shm_status_ptr->mutex);
-    usleep(*delay_ms * 1000);
-    pthread_mutex_lock(&shm_status_ptr->mutex);
-
-    closing_doors(shm_status_ptr);
-
-    pthread_mutex_unlock(&shm_status_ptr->mutex);
-    usleep(*delay_ms * 1000);
-    pthread_mutex_lock(&shm_status_ptr->mutex);
-
-    close_doors(shm_status_ptr, delay_ms);
-
+    door_open_close(shm_status_ptr, delay_ms, shm_status_ptr->door_obstruction);
     return;
   }
 

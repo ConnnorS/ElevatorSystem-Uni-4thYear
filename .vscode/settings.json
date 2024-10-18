@@ -13,6 +13,7 @@
     "mman.h": "c",
     "stdint.h": "c",
     "type_conversions.h": "c",
-    "typeinfo": "cpp"
+    "typeinfo": "cpp",
+    "string.h": "c"
   }
 }
