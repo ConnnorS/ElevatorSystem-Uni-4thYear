@@ -208,6 +208,21 @@ int main(int argc, char **argv)
     pthread_mutex_unlock(&shm_status_ptr->mutex);
   }
 
+  /* wait for the threads to end - this will happen when system_running is set
+  to 0 with CTRL + C */
+  pthread_join(server_receive_handler, NULL);
+  pthread_join(server_send_handler, NULL);
+
+  pthread_mutex_destroy(&shm_status_ptr->mutex);
+  pthread_cond_destroy(&shm_status_ptr->cond);
+  printf("Destroyed mutexes and conds\n");
+
+  /* do the cleanup when the threads end */
+  if (shm_unlink(shm_status_name) == -1)
+  {
+    perror("shm_unlink()");
+  }
+
   free(thread_data);
   free(shm_status_name);
   free(name);
