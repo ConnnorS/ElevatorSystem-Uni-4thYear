@@ -5,6 +5,9 @@
 // networks
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <fcntl.h>
+// systems
+#include <sys/select.h>
 
 /* simple function to set up a TCP connection with the controller
 then return an int which is the socketFd */
@@ -32,7 +35,6 @@ int connect_to_control_system()
   // connect to the server
   if (connect(socketFd, (const struct sockaddr *)&addr, sizeof(addr)) == -1)
   {
-    perror("connect()");
     return -1;
   }
 

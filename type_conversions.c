@@ -1,13 +1,45 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+int check_floor_length(char *floor)
+{
+  if (strlen(floor) > 4)
+  {
+    return 0;
+  }
+  return 1;
+}
+
+int check_floor_contents(char *floor)
+{
+  // start one character over if basement floor
+  int index = 0;
+  if (floor[0] == 'B')
+  {
+    index = 1;
+  }
+  // validate the contents
+  for (index = index; index < strlen(floor); index++)
+  {
+    if (!isdigit(floor[index]))
+    {
+      return 0;
+    }
+  }
+  return 1;
+}
 
 int floor_char_to_int(char *floor)
 {
-  if (floor[0] == 'B')
+  char temp[8];
+  strcpy(temp, floor);
+  if (temp[0] == 'B')
   {
-    floor[0] = '-';
+    temp[0] = '-';
   }
-  return atoi(floor);
+  return atoi(temp);
 }
 
 void floor_int_to_char(int floor, char *floorChar)
@@ -22,23 +54,13 @@ void floor_int_to_char(int floor, char *floorChar)
   }
 }
 
-void validate_floor_range(int floor)
+int validate_floor_range(int floor)
 {
-  if (floor < -99)
+  if (floor < -99 || floor > 999 || floor == 0)
   {
-    printf("Lowest or highest floor cannot be lower than B99\n");
-    exit(1);
+    return -1;
   }
-  else if (floor > 999)
-  {
-    printf("Lowest or highest floor cannot be higher than 999\n");
-    exit(1);
-  }
-  else if (floor == 0)
-  {
-    printf("Floor cannot be zero\n");
-    exit(1);
-  }
+  return 1;
 }
 
 void compare_highest_lowest(int lowest, int highest)

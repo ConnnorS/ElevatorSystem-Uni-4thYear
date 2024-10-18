@@ -172,10 +172,8 @@ void remove_client(client_t *client, client_t ***clients, int *client_count)
   {
     int index;
 
-    printf("Searching through %d clients\n", *client_count);
     for (index = 0; index < *client_count; index++)
     {
-      printf("Index: %d\n", index);
       if ((*clients)[index] == client)
       {
         break;
@@ -185,14 +183,11 @@ void remove_client(client_t *client, client_t ***clients, int *client_count)
     /* if the disconnecting client is not at the end */
     if (index < *client_count)
     {
-      printf("Client found at index %d\n", index);
       /* shift all the elements in the clients array to the right */
-      for (index; index < *client_count - 1; index++)
+      for (index = index; index < *client_count - 1; index++)
       {
-        printf("Shifting %d <-- %d  ", index, index + 1);
         clients[index] = clients[index + 1];
       }
-      printf("\n");
     }
     *clients = realloc(*clients, sizeof(client_t *) * (*client_count - 1));
   }

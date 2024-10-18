@@ -27,10 +27,23 @@ INTERNAL_SRC = ./Internal/internal.c ./Internal/internal_helpers.c type_conversi
 internal: $(INTERNAL_SRC)
 	$(CC) -o internal $(INTERNAL_SRC) $(FLAGS)
 
-# --- SAFETY COMPONENT ---- #
-SAFETY_SRC = ./Safety/safety.c
+# ---- SAFETY COMPONENT ---- #
+SAFETY_SRC = ./Safety/safety.c type_conversions.c
 safety: $(SAFETY_SRC)
-	$(CC) -o safety $(INTERNAL_SRC) $(FLAGS)
+	$(CC) -o safety $(SAFETY_SRC) $(FLAGS)
 
+# ---- MOVES INTO TEST FOLDER FOR TESTING ---- #
+for_testing:
+	make
+	mv $(FILES) ./test
+	make -C /home/cab403/CAB403-A2---Major-Project/test
+
+# ---- CLEAN EVERYTHING ---- #
 clean:
 	rm -f $(FILES)
+	rm -f /home/cab403/CAB403-A2---Major-Project/test/car \
+	      /home/cab403/CAB403-A2---Major-Project/test/call \
+	      /home/cab403/CAB403-A2---Major-Project/test/controller \
+	      /home/cab403/CAB403-A2---Major-Project/test/internal \
+	      /home/cab403/CAB403-A2---Major-Project/test/safety	
+	make -C /home/cab403/CAB403-A2---Major-Project/test clean

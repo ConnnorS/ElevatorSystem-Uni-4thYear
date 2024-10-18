@@ -42,7 +42,7 @@ void do_ftruncate(int fd, int size)
   }
 }
 
-void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor_char)
+void init_shared_mem(car_shared_mem *shm_status_ptr, const char *lowest_floor_char)
 {
   // initialise the shared mutex
   pthread_mutexattr_t attr;
@@ -75,8 +75,24 @@ void add_default_values(car_shared_mem *shm_status_ptr, const char *lowest_floor
 
 void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms)
 {
+  /* if the doors are open, close them */
+  if (strcmp(shm_status_ptr->status, "Open") == 0)
+  {
+    closing_doors(shm_status_ptr, delay_ms);
+
+    pthread_mutex_unlock(&shm_status_ptr->mutex);
+    usleep(*delay_ms * 1000);
+    pthread_mutex_lock(&shm_status_ptr->mutex);
+
+    close_doors(shm_status_ptr);
+  }
+
   /* now set the car to between */
   set_between(shm_status_ptr);
+
+  pthread_mutex_unlock(&shm_status_ptr->mutex);
+  usleep(*delay_ms * 1000);
+  pthread_mutex_lock(&shm_status_ptr->mutex);
 
   /* now move up or down one floor */
   int current_floor_int = floor_char_to_int(shm_status_ptr->current_floor);
@@ -86,50 +102,43 @@ void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms)
     current_floor_int += direction;
   }
   floor_int_to_char(current_floor_int, shm_status_ptr->current_floor);
-
-  printf("Car is now on floor %s\n", shm_status_ptr->current_floor);
+  pthread_cond_broadcast(&shm_status_ptr->cond);
 
   /* if the car hits the destination floor - open and close the doors only if not in service mode */
   if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0 && shm_status_ptr->individual_service_mode == 0)
   {
-    opening_doors(shm_status_ptr);
-
-    pthread_mutex_unlock(&shm_status_ptr->mutex);
-    sleep(*delay_ms / 1000);
-    pthread_mutex_lock(&shm_status_ptr->mutex);
-
-    open_doors(shm_status_ptr);
-
-    pthread_mutex_unlock(&shm_status_ptr->mutex);
-    sleep(*delay_ms / 1000);
-    pthread_mutex_lock(&shm_status_ptr->mutex);
-
-    closing_doors(shm_status_ptr);
-
-    pthread_mutex_unlock(&shm_status_ptr->mutex);
-    sleep(*delay_ms / 1000);
-    pthread_mutex_lock(&shm_status_ptr->mutex);
-
-    close_doors(shm_status_ptr);
-  }
-  else if (shm_status_ptr->individual_service_mode == 1) // the car is in service mode so just close the doors
-  {
-    sleep(*delay_ms / 1000);
-    close_doors(shm_status_ptr);
+    door_open_close(shm_status_ptr, delay_ms, shm_status_ptr->door_obstruction);
   }
 }
 
-void handle_dest_floor_change(car_shared_mem *shm_status_ptr, int *delay_ms)
+void handle_dest_floor_change(car_shared_mem *shm_status_ptr, int *delay_ms, int *lowest_floor_int, int *highest_floor_int)
 {
   /* find the direction the car must move */
-  int direction;
-  if (floor_char_to_int(shm_status_ptr->current_floor) < floor_char_to_int(shm_status_ptr->destination_floor))
+  int direction = 0;
+  int current_floor = floor_char_to_int(shm_status_ptr->current_floor);
+  int destination_floor = floor_char_to_int(shm_status_ptr->destination_floor);
+
+  if (current_floor < destination_floor)
   {
     direction = 1; // up
   }
-  else
+  else if (current_floor > destination_floor)
   {
     direction = -1; // down
+  }
+
+  /* ensure the car won't go out of bounds */
+  if (current_floor + direction < *lowest_floor_int || current_floor + direction > *highest_floor_int)
+  {
+    strcpy(shm_status_ptr->destination_floor, shm_status_ptr->current_floor);
+    return;
+  }
+
+  /* if the car has been sent the floor it's on */
+  if (direction == 0)
+  {
+    door_open_close(shm_status_ptr, delay_ms, shm_status_ptr->door_obstruction);
+    return;
   }
 
   /* now move floors */
