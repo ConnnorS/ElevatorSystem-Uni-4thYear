@@ -1,4 +1,16 @@
-/* MISRA C Violations Justification */
+/*
+---------- MISRA C Violations Justification ----------
+--- using document from Canvas: https://canvas.qut.edu.au/courses/16677/files/4582962?wrap=1 ---
+
+Violation of Rule 20.9 - "The input/output library <stdio.h> shall not be used in production
+code."
+  - the stdio.h library is required for printf() functions to display error messages to the user.
+  - in a real production environment, a safer alternative might be writing to a log file
+
+Violation
+
+
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
