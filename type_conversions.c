@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 
 int floor_char_to_int(char *floor)
 {
@@ -33,17 +32,4 @@ int validate_floor_range(int floor)
     return -1;
   }
   return 1;
-}
-
-void compare_highest_lowest(int lowest, int highest)
-{
-  if (highest < lowest)
-  {
-    printf("Highest floor (%s%d) cannot be lower than the lowest floor (%s%d)\n",
-           (highest < 0) ? "B" : "",
-           (highest < 0) ? highest * -1 : highest,
-           (lowest < 0) ? "B" : "",
-           (lowest < 0) ? lowest * -1 : lowest);
-    exit(1);
-  }
 }
