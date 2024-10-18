@@ -28,7 +28,7 @@ internal: $(INTERNAL_SRC)
 	$(CC) -o internal $(INTERNAL_SRC) $(FLAGS)
 
 # ---- SAFETY COMPONENT ---- #
-SAFETY_SRC = ./Safety/safety.c type_conversions.c
+SAFETY_SRC = ./Safety/safety.c
 safety: $(SAFETY_SRC)
 	$(CC) -o safety $(SAFETY_SRC) $(FLAGS)
 

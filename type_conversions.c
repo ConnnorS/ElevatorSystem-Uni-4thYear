@@ -3,34 +3,6 @@
 #include <string.h>
 #include <ctype.h>
 
-int check_floor_length(char *floor)
-{
-  if (strlen(floor) > 4)
-  {
-    return 0;
-  }
-  return 1;
-}
-
-int check_floor_contents(char *floor)
-{
-  // start one character over if basement floor
-  int index = 0;
-  if (floor[0] == 'B')
-  {
-    index = 1;
-  }
-  // validate the contents
-  for (index = index; index < strlen(floor); index++)
-  {
-    if (!isdigit(floor[index]))
-    {
-      return 0;
-    }
-  }
-  return 1;
-}
-
 int floor_char_to_int(char *floor)
 {
   char temp[8];
