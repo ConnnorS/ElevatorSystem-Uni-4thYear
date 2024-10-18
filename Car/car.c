@@ -104,6 +104,18 @@ int main(int argc, char **argv)
         pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
       }
     }
+    /* emergency mode wait */
+    else if (in_emergency_mode)
+    {
+      while (system_running &&                            // system is running
+             shm_status_ptr->open_button == 0 &&          // the open button hasn't been pressed
+             shm_status_ptr->close_button == 0 &&         // the close button hasn't been pressed
+             shm_status_ptr->individual_service_mode == 0 // the car is not in service mode
+      )
+      {
+        pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
+      }
+    }
     /* normal conditions wait */
     else
     {
@@ -123,6 +135,12 @@ int main(int argc, char **argv)
     /* if the car is placed into service mode for the first time */
     if (shm_status_ptr->individual_service_mode && !in_service_mode)
     {
+      if (in_emergency_mode)
+      {
+        printf("Car leaving emergency mode\n");
+        shm_status_ptr->emergency_mode = 0;
+        in_emergency_mode = 0;
+      }
       printf("Car entering service mode\n");
       handle_service_mode(shm_status_ptr);
       in_service_mode = 1;
@@ -134,10 +152,12 @@ int main(int argc, char **argv)
       in_service_mode = 0;
       pthread_create(&server_send_handler, NULL, control_system_send_handler, thread_data); // spin up a new thread again
     }
-    /* if dest is different to current */
-    else if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) != 0)
+    /* if placed into emergency mode for the first time */
+    else if (shm_status_ptr->emergency_mode && !in_emergency_mode)
     {
-      handle_dest_floor_change(shm_status_ptr, &delay_ms, &lowest_floor_int, &highest_floor_int);
+      printf("Car entering emergency mode\n");
+      in_emergency_mode = 1;
+      shm_status_ptr->emergency_stop = 0;
     }
     /* if the open button is pressed */
     else if (shm_status_ptr->open_button == 1)
@@ -179,6 +199,11 @@ int main(int argc, char **argv)
         close_doors(shm_status_ptr);
       }
       shm_status_ptr->close_button = 0;
+    }
+    /* if dest is different to current */
+    else if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) != 0)
+    {
+      handle_dest_floor_change(shm_status_ptr, &delay_ms, &lowest_floor_int, &highest_floor_int);
     }
     pthread_mutex_unlock(&shm_status_ptr->mutex);
   }
