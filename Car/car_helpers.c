@@ -102,12 +102,13 @@ void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms)
     current_floor_int += direction;
   }
   floor_int_to_char(current_floor_int, shm_status_ptr->current_floor);
+  close_doors(shm_status_ptr);
   pthread_cond_broadcast(&shm_status_ptr->cond);
 
   /* if the car hits the destination floor - open and close the doors only if not in service mode */
   if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) == 0 && shm_status_ptr->individual_service_mode == 0)
   {
-    door_open_close(shm_status_ptr, delay_ms, shm_status_ptr->door_obstruction);
+    door_open_close(shm_status_ptr, delay_ms);
   }
 }
 
@@ -137,7 +138,7 @@ void handle_dest_floor_change(car_shared_mem *shm_status_ptr, int *delay_ms, int
   /* if the car has been sent the floor it's on */
   if (direction == 0)
   {
-    door_open_close(shm_status_ptr, delay_ms, shm_status_ptr->door_obstruction);
+    door_open_close(shm_status_ptr, delay_ms);
     return;
   }
 

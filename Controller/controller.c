@@ -136,7 +136,11 @@ void *handle_client(void *arg)
       /* kill the thread since it's a call pad and doesn't need to stay connected */
       client->connected = 0;
     }
-    else if (strncmp(message, "INDIVIDUAL SERVICE", 18) == 0)
+    else if (strcmp(message, "INDIVIDUAL SERVICE") == 0)
+    {
+      printf("Car %s is in %s\n", client->name, message);
+    }
+    else if (strcmp(message, "EMERGENCY") == 0)
     {
       printf("Car %s is in %s\n", client->name, message);
     }
