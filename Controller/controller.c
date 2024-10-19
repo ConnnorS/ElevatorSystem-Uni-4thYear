@@ -8,6 +8,8 @@
 // signal
 #include <signal.h>
 // networks
+#include <fcntl.h>
+#include <sys/socket.h>
 // helpers
 #include "controller_helpers.h"
 #include "../type_conversions.h"
@@ -22,10 +24,54 @@ int client_count = 0;
 /* function declarations */
 void *queue_manager(void *arg);  // manages the queue for each connected client_t and sends FLOOR messages
 void *client_handler(void *arg); // manages the incoming messages for each connected client_t and updates its info
+void system_shutdown(int sig);   // handle CTRL + C
 
 int main(void)
 {
+  signal(SIGINT, system_shutdown);
+
+  clients = malloc(0);
+
+  /* start up the server and make non-blocking */
+  int serverFd = create_server();
+  int flags = fcntl(serverFd, F_GETFL, 0);
+  fcntl(serverFd, F_SETFL, flags | O_NONBLOCK);
+
+  struct sockaddr clientaddr;
+  socklen_t clientaddr_len;
+
+  /* for each new connected client, handle them in a thread */
+  int new_socket = -1;
+  while (system_running)
+  {
+    new_socket = accept(serverFd, (struct sockaddr *)&clientaddr, &clientaddr_len);
+    if (new_socket >= 0)
+    {
+      /* allocate a section of memory for a new client */
+      client_t *new_client = malloc(sizeof(client_t));
+
+      new_client->fd = new_socket;
+      new_client->connected = 1;
+
+      pthread_mutex_lock(&clients_mutex);
+      /* increase the array of pointers to clients */
+      clients = realloc(clients, sizeof(client_t *) * (client_count + 1));
+      clients[client_count] = new_client;
+      client_count++;
+      pthread_mutex_unlock(&clients_mutex);
+
+      /* create the handler thread */
+      pthread_t client_handler_thread;
+      pthread_create(&client_handler_thread, NULL, client_handler, new_client);
+    }
+  }
+
   return 0;
+}
+
+void system_shutdown(int sig)
+{
+  system_running = 0;
 }
 
 void *client_handler(void *arg)
@@ -39,7 +85,7 @@ void *client_handler(void *arg)
   int fd = client->fd; // local variable to avoid constant mutex locking/unlocking
   client->queue = malloc(0);
   client->queue_length = 0;
-  printf("New client %s connected with fd %d\n", client->name, client->fd);
+  printf("New client connected with fd %d\n", client->fd);
   pthread_mutex_unlock(&clients_mutex);
 
   while (system_running && client->connected)
@@ -53,7 +99,7 @@ void *client_handler(void *arg)
       break;
     }
     /* new car connected */
-    else if (strcmp(message, "CAR") == 0)
+    else if (strncmp(message, "CAR", 3) == 0)
     {
       handle_received_car_message(client, message);
       printf("New car connected: %s %s %s\n", client->name, client->lowest_floor, client->highest_floor);
@@ -61,26 +107,21 @@ void *client_handler(void *arg)
       client->type = IS_CAR;
     }
     /* received status message */
-    else if (strcmp(message, "STATUS") == 0)
+    else if (strncmp(message, "STATUS", 6) == 0)
     {
       handle_received_status_message(client, message);
       printf("Received status message from %s: %s %s %s\n", client->name, client->status, client->current_floor, client->destination_floor);
     }
     /* call pad connected */
-    else if (strcmp(message, "CALL") == 0)
+    else if (strncmp(message, "CALL", 4) == 0)
     {
       handle_received_call_message(client, message, clients, &client_count);
       /* call pads don't need to stay connected so thread can end */
       pthread_mutex_unlock(&clients_mutex);
       break;
     }
-    /* car in service mode */
-    else if (strcmp(message, "INDIVIDUAL SERVICE") == 0)
-    {
-      printf("Car %s is in %s\n", client->name, message);
-    }
-    /* car is in emergency mode */
-    else if (strcmp(message, "EMERGENCY") == 0)
+    /* car in service mode or emergency mode */
+    else if (strcmp(message, "INDIVIDUAL SERVICE") == 0 || strcmp(message, "EMERGENCY") == 0)
     {
       printf("Car %s is in %s\n", client->name, message);
     }
