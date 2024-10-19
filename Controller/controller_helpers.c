@@ -15,6 +15,9 @@
 #include "../type_conversions.h"
 #include "../common_comms.h"
 
+#define UP 1
+#define DOWN -1
+
 int create_server()
 {
   struct sockaddr_in addr;
@@ -100,7 +103,7 @@ int floors_are_in_range(int sourceFloor, int destinationFloor, int lowestFloor, 
          (destinationFloor >= lowestFloor && destinationFloor <= highestFloor);
 }
 
-void add_floor_to_queue(int **queue, int *queue_length, int *floor)
+void add_floor_to_queue(int **queue, int *queue_length, int *floor, int *call_direction)
 {
   /* check if the floor is already in the queue */
   for (int index = 0; index < *queue_length; index++)
@@ -108,8 +111,7 @@ void add_floor_to_queue(int **queue, int *queue_length, int *floor)
     if ((*queue)[index] == *floor)
       return;
   }
-
-  /* if not, add the floor */
+  
   *queue_length += 1;
   *queue = realloc(*queue, sizeof(int) * (*queue_length));
   (*queue)[*queue_length - 1] = *floor;
@@ -121,15 +123,15 @@ int find_car_for_floor(int *source_floor, int *destination_floor, client_t **cli
   int found = 0;
   client_t **options = malloc(0);
   int options_count = 0;
+
+  /* find the clients which can service this request */
   client_t *current;
-  /* find a client which can service the request */
   for (int index = 0; index < *client_count; index++)
   {
     current = (client_t *)clients[index];
     int current_lowest_floor_int = floor_char_to_int(current->lowest_floor);
     int current_highest_floor_int = floor_char_to_int(current->highest_floor);
     int can_service = floors_are_in_range(*source_floor, *destination_floor, current_lowest_floor_int, current_highest_floor_int);
-    /* find the clients which can service this request */
     if (current->type == IS_CAR && can_service)
     {
       found = 1;
@@ -154,9 +156,12 @@ int find_car_for_floor(int *source_floor, int *destination_floor, client_t **cli
 
     strcpy(chosen_car, current->name);
 
+    /* determine the direction of the floors */
+    int direction = *source_floor < *destination_floor ? UP : DOWN;
+
     /* add the floors to their queue */
-    add_floor_to_queue(&current->queue, &current->queue_length, source_floor);
-    add_floor_to_queue(&current->queue, &current->queue_length, destination_floor);
+    add_floor_to_queue(&current->queue, &current->queue_length, source_floor, &direction);
+    add_floor_to_queue(&current->queue, &current->queue_length, destination_floor, &direction);
 
     // /* FOR TESTING - REMOVE LATER */
     printf("Car %s\'s queue of length %d: ", current->name, current->queue_length);
