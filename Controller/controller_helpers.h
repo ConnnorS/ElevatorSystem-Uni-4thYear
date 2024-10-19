@@ -29,6 +29,7 @@ void handle_received_car_message(client_t *client, char *message);
 void handle_received_status_message(client_t *client, char *message);
 void initialise_cond(client_t *client);
 void extract_call_floors(char *message, int *source_floor, int *destination_floor);
-int find_car_for_floor(int *source_floor, int *destination_floor, client_t **clients, int client_count, char *chosen_car);
+int find_car_for_floor(int *source_floor, int *destination_floor, client_t **clients, int *client_count, char *chosen_car);
 void remove_from_queue(client_t *client);
 void remove_client(client_t *client, client_t ***clients, int *client_count);
+void handle_received_call_message(client_t *client, char *message, client_t **clients, int *client_count);
