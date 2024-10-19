@@ -23,7 +23,7 @@ call: $(CALL_SRC)
 	$(CC) -o call $(CALL_SRC) $(FLAGS)
 
 # ---- INTERNAL COMPONENT ---- #
-INTERNAL_SRC = ./Internal/internal.c ./Internal/internal_helpers.c type_conversions.c
+INTERNAL_SRC = ./Internal/internal.c type_conversions.c
 internal: $(INTERNAL_SRC)
 	$(CC) -o internal $(INTERNAL_SRC) $(FLAGS)
 

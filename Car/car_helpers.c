@@ -44,7 +44,7 @@ void do_ftruncate(int fd, int size)
 
 void init_shared_mem(car_shared_mem *shm_status_ptr, const char *lowest_floor_char)
 {
-  // initialise the shared mutex
+  /* initialise the shared mutex */
   pthread_mutexattr_t attr;
   pthread_mutexattr_init(&attr);
   pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
@@ -52,7 +52,7 @@ void init_shared_mem(car_shared_mem *shm_status_ptr, const char *lowest_floor_ch
   {
     printf("Mutex init failed\n");
   }
-  // initialise the shared condition variable
+  /* initialise the shared condition variable */
   pthread_condattr_t cond_attr;
   pthread_condattr_init(&cond_attr);
   pthread_condattr_setpshared(&cond_attr, PTHREAD_PROCESS_SHARED);
@@ -60,7 +60,7 @@ void init_shared_mem(car_shared_mem *shm_status_ptr, const char *lowest_floor_ch
   {
     printf("Cond init failed\n");
   }
-
+  /* add in default values as per specification sheet */
   strcpy(shm_status_ptr->current_floor, lowest_floor_char);
   strcpy(shm_status_ptr->destination_floor, lowest_floor_char);
   strcpy(shm_status_ptr->status, "Closed");
@@ -135,7 +135,7 @@ void handle_dest_floor_change(car_shared_mem *shm_status_ptr, int *delay_ms, int
     return;
   }
 
-  /* if the car has been sent the floor it's on */
+  /* if the car has been sent the floor it's on - open and close the doors to pick up the passenger */
   if (direction == 0)
   {
     door_open_close(shm_status_ptr, delay_ms);

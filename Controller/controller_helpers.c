@@ -13,6 +13,10 @@
 // headers
 #include "controller_helpers.h"
 #include "../type_conversions.h"
+#include "../common_comms.h"
+
+#define UP 1
+#define DOWN -1
 
 int create_server()
 {
@@ -93,49 +97,89 @@ void extract_call_floors(char *message, int *source_floor, int *destination_floo
   *destination_floor = floor_char_to_int(destination);
 }
 
-/* helper to initialise the condition variable for each client */
-void initialise_cond(client_t *client)
-{
-  pthread_condattr_t cond_attr;
-  pthread_condattr_init(&cond_attr);
-  pthread_condattr_setpshared(&cond_attr, PTHREAD_PROCESS_SHARED);
-  pthread_cond_init(&client->queue_cond, NULL);
-}
-
 int floors_are_in_range(int sourceFloor, int destinationFloor, int lowestFloor, int highestFloor)
 {
   return (sourceFloor >= lowestFloor && sourceFloor <= highestFloor) &&
          (destinationFloor >= lowestFloor && destinationFloor <= highestFloor);
 }
 
+void append_floor(client_t *client, int *floor)
+{
+  /* only append if floor isn't in queue */
+  for (int index = 0; index < client->queue_length; index++)
+  {
+    if (client->queue[index] == *floor)
+    {
+      return;
+    }
+  }
+  client->queue_length += 1;
+  client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
+  client->queue[client->queue_length - 1] = *floor;
+}
+
+void add_floors_to_queue(client_t *client, int *source_floor, int *destination_floor)
+{
+  /* if empty queue - just add in like usual */
+  if (client->queue_length == 0)
+  {
+    append_floor(client, source_floor);
+    append_floor(client, destination_floor);
+    return;
+  }
+
+  /* if either floor won't fit in the range of the queue they'll need to be appended */
+  if (!floors_are_in_range(*source_floor, *destination_floor, client->queue[0], client->queue[client->queue_length - 1]))
+  {
+    append_floor(client, source_floor);
+    append_floor(client, destination_floor);
+    return;
+  }
+
+  /* if both will fit in the range, then we'll add them in while sorting the queue accordingly */
+}
+
 /* finds the fd of the car which can service the floors then adds them to the queue */
-int find_car_for_floor(int *source_floor, int *destination_floor, client_t **clients, int client_count, char *chosen_car)
+int find_car_for_floor(int *source_floor, int *destination_floor, client_t **clients, int *client_count, char *chosen_car)
 {
   int found = 0;
+  client_t **options = malloc(0);
+  int options_count = 0;
+
+  /* find the clients which can service this request */
   client_t *current;
-  /* find a client which can service the request */
-  for (int index = 0; index < client_count; index++)
+  for (int index = 0; index < *client_count; index++)
   {
     current = (client_t *)clients[index];
     int current_lowest_floor_int = floor_char_to_int(current->lowest_floor);
     int current_highest_floor_int = floor_char_to_int(current->highest_floor);
     int can_service = floors_are_in_range(*source_floor, *destination_floor, current_lowest_floor_int, current_highest_floor_int);
-    /* if the client is a car and can service the range of floors */
     if (current->type == IS_CAR && can_service)
     {
-      strcpy(chosen_car, current->name);
       found = 1;
-      break;
+      /* add the client to our list of options */
+      options_count += 1;
+      options = realloc(options, sizeof(client_t *) * options_count);
+      options[options_count - 1] = current;
     }
   }
 
-  /* if found, add the floors to their queue */
   if (found)
   {
-    current->queue_length += 2;
-    current->queue = realloc(current->queue, sizeof(int) * (current->queue_length));
-    current->queue[current->queue_length - 2] = *source_floor;
-    current->queue[current->queue_length - 1] = *destination_floor;
+    /* find the car with the smallest queue to minimise disruptions */
+    current = options[0];
+    for (int index = 1; index < options_count; index++)
+    {
+      if (options[index]->queue_length < current->queue_length)
+      {
+        current = options[index];
+      }
+    }
+
+    strcpy(chosen_car, current->name);
+
+    /* add the floors to their queue */
+    add_floors_to_queue(current, source_floor, destination_floor);
 
     // /* FOR TESTING - REMOVE LATER */
     printf("Car %s\'s queue of length %d: ", current->name, current->queue_length);
@@ -145,11 +189,45 @@ int find_car_for_floor(int *source_floor, int *destination_floor, client_t **cli
     }
     printf("\n");
 
-    // signal the watching queue thread to wake up
+    /* signal the watching queue thread to wake up */
     pthread_cond_signal(&current->queue_cond);
   }
 
+  free(options);
   return found;
+}
+
+/* gets the desired floors of the call message and then searches for a client to service those floors */
+void handle_received_call_message(client_t *client, char *message, client_t **clients, int *client_count)
+{
+  client->type = IS_CALL;
+  /* extract data */
+  int source_floor = 0, destination_floor = 0;
+  extract_call_floors(message, &source_floor, &destination_floor);
+  printf("Received call message for %d-%d\n", source_floor, destination_floor);
+
+  /* find car to service */
+  char chosen_car[64];
+  if (find_car_for_floor(&source_floor, &destination_floor, clients, client_count, chosen_car))
+  {
+    printf("%s can service this request\n", chosen_car);
+    char response[68];
+    snprintf(response, sizeof(response), "Car %s", chosen_car);
+    send_message(client->fd, response);
+  }
+  else
+  {
+    send_message(client->fd, "UNAVAILABLE");
+  }
+}
+
+/* helper to initialise the condition variable for each client */
+void initialise_cond(client_t *client)
+{
+  pthread_condattr_t cond_attr;
+  pthread_condattr_init(&cond_attr);
+  pthread_condattr_setpshared(&cond_attr, PTHREAD_PROCESS_SHARED);
+  pthread_cond_init(&client->queue_cond, NULL);
 }
 
 /* remove the most recent floor from the queue */
@@ -166,6 +244,7 @@ void remove_from_queue(client_t *client)
   client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
 }
 
+/* remove the specified client from the queue */
 void remove_client(client_t *client, client_t ***clients, int *client_count)
 {
   if (*client_count > 1)
@@ -184,7 +263,7 @@ void remove_client(client_t *client, client_t ***clients, int *client_count)
     if (index < *client_count)
     {
       /* shift all the elements in the clients array to the right */
-      for (index = index; index < *client_count - 1; index++)
+      for (; index < *client_count - 1; index++)
       {
         clients[index] = clients[index + 1];
       }

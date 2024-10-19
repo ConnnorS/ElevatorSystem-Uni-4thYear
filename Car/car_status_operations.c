@@ -11,34 +11,34 @@
 void opening_doors(car_shared_mem *shm_status_ptr)
 {
   strcpy(shm_status_ptr->status, "Opening");
-  printf("Status set to: %s\n", shm_status_ptr->status);
+  //printf("Status set to: %s\n", shm_status_ptr->status);
   pthread_cond_broadcast(&shm_status_ptr->cond);
 }
 
 void open_doors(car_shared_mem *shm_status_ptr)
 {
   strcpy(shm_status_ptr->status, "Open");
-  printf("Status set to: %s\n", shm_status_ptr->status);
+  //printf("Status set to: %s\n", shm_status_ptr->status);
   pthread_cond_broadcast(&shm_status_ptr->cond);
 }
 
 void close_doors(car_shared_mem *shm_status_ptr)
 {
   strcpy(shm_status_ptr->status, "Closed");
-  printf("Status set to: %s\n", shm_status_ptr->status);
+  //printf("Status set to: %s\n", shm_status_ptr->status);
   pthread_cond_broadcast(&shm_status_ptr->cond);
 }
 
 void set_between(car_shared_mem *shm_status_ptr)
 {
   strcpy(shm_status_ptr->status, "Between");
-  printf("Status set to: %s\n", shm_status_ptr->status);
+  //printf("Status set to: %s\n", shm_status_ptr->status);
   pthread_cond_broadcast(&shm_status_ptr->cond);
 }
 
 void closing_doors(car_shared_mem *shm_status_ptr, int *delay_ms)
 {
-  printf("Status set to: Closing\n");
+  //printf("Status set to: Closing\n");
   strcpy(shm_status_ptr->status, "Closing");
 
   /* constantly try and close doors while there's an obstruction */

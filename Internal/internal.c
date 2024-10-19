@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 // threads
 #include <pthread.h>
 // shared memory
@@ -9,8 +10,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 // my functions
-#include "internal_helpers.h"
 #include "../type_conversions.h"
+#include "../common_headers.h"
+
+int verify_operation(char *operation);
 
 /* {file} {car name} {operation} */
 int main(int argc, char **argv)
@@ -22,14 +25,14 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  char shm_status_name[64];
-  char operation[12];
+  char shm_status_name[SHM_NAME_LEN];
+  char operation[OPERATION_LEN];
   snprintf(shm_status_name, sizeof(shm_status_name), "/car%s", argv[1]);
   strcpy((char *)operation, argv[2]);
 
   if (verify_operation((char *)operation) == 0)
   {
-    printf("Invalid operation\n");
+    printf("Invalid operation.\n");
     exit(1);
   }
 
@@ -61,7 +64,7 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-    /* if the up or down command is entered but the car is moving */
+  /* if the up or down command is entered but the car is moving */
   if ((strcmp(operation, "up") == 0 || strcmp(operation, "down") == 0) && strcmp(shm_status_ptr->status, "Between") == 0)
   {
     printf("Operation not allowed while elevator is moving.\n");
@@ -117,19 +120,6 @@ int main(int argc, char **argv)
     } while (destination_int == 0); // ensure the floor does not hit 0
     floor_int_to_char(destination_int, shm_status_ptr->destination_floor);
   }
-  /* FOR TESTING REMOVE LATER */
-  else if (strcmp(operation, "emrg") == 0)
-  {
-    shm_status_ptr->emergency_stop = 1;
-  }
-  else if (strcmp(operation, "obs_on") == 0)
-  {
-    shm_status_ptr->door_obstruction = 1;
-  }
-  else if (strcmp(operation, "obs_off") == 0)
-  {
-    shm_status_ptr->door_obstruction = 0;
-  }
 
   /* finally, signal the cond and exit */
   pthread_cond_broadcast(&shm_status_ptr->cond);
@@ -137,5 +127,18 @@ int main(int argc, char **argv)
 
   munmap(shm_status_ptr, sizeof(car_shared_mem));
 
+  return 0;
+}
+
+int verify_operation(char *operation)
+{
+  const char operations[NUM_OPERATIONS][12] = {"open", "close", "stop", "service_on", "service_off", "up", "down"};
+  for (int i = 0; i < 7; i++)
+  {
+    if (strcmp(operation, operations[i]) == 0)
+    {
+      return 1;
+    }
+  }
   return 0;
 }

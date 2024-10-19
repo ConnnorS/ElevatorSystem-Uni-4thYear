@@ -13,6 +13,7 @@
 // my functions
 #include "../common_comms.h"
 #include "../type_conversions.h"
+#include "../common_headers.h"
 
 /* {source floor} {destination floor} */
 int main(int argc, char **argv)
@@ -24,9 +25,9 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  char source_floor[8];
+  char source_floor[FLOOR_LEN];
   strcpy(source_floor, argv[1]);
-  char destination_floor[8];
+  char destination_floor[FLOOR_LEN];
   strcpy(destination_floor, argv[2]);
 
   /* validate floor ranges */
@@ -35,7 +36,7 @@ int main(int argc, char **argv)
 
   if (validate_floor_range(source_floor_int) == -1 || validate_floor_range(destination_floor_int) == -1)
   {
-    printf("Invalid floor(s) specified\n");
+    printf("Invalid floor(s) specified.\n");
     exit(1);
   }
 
@@ -49,12 +50,12 @@ int main(int argc, char **argv)
   int serverFd = connect_to_control_system();
   if (serverFd == -1)
   {
-    printf("Unable to connect to elevator system\n");
+    printf("Unable to connect to elevator system.\n");
     exit(1);
   }
 
   /* prepare and send the message */
-  char message[64];
+  char message[MESSAGE_LEN];
   snprintf(message, sizeof(message), "CALL %s %s", source_floor, destination_floor);
   send_message(serverFd, message);
 

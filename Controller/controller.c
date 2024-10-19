@@ -1,189 +1,38 @@
-// basic C stuff
+// basic C
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-// threads
-#include <pthread.h>
-// shared memory
-#include <sys/mman.h>
-#include <fcntl.h>
+#include <stdlib.h>
 #include <unistd.h>
-// networks
-#include <arpa/inet.h>
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <sys/socket.h>
+// pthreads
+#include <pthread.h>
 // signal
 #include <signal.h>
-// header file
+// networks
+#include <fcntl.h>
+#include <sys/socket.h>
+// helpers
 #include "controller_helpers.h"
-#include "../common_comms.h"
 #include "../type_conversions.h"
+#include "../common_comms.h"
 
 /* global variables */
 volatile sig_atomic_t system_running = 1;
-
-client_t **clients; // array of pointers to each client_t object for each connected client
+client_t **clients; // array of pointers for each client_t object
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
-int client_count;
+int client_count = 0;
 
-/* seperate thread for each connected car to manage its queue
-and send requests to move to the floors */
-void *queue_manager(void *arg)
-{
-  client_t *client = arg;
-
-  while (system_running && client->connected)
-  {
-    pthread_mutex_lock(&clients_mutex);
-
-    /* wait while the client is connected, not at its destination floor, the doors are not closed, and the queue is empty */
-    while (client->connected == 1 && (strcmp(client->current_floor, client->destination_floor) != 0 || strcmp(client->status, "Closed") != 0 || client->queue_length == 0))
-    {
-      pthread_cond_wait(&client->queue_cond, &clients_mutex);
-    }
-
-    /* check if meant to exit */
-    if (client->connected == 0)
-    {
-      pthread_mutex_unlock(&clients_mutex);
-      break;
-    }
-    printf("Car %s ready - sending next floor request\n", client->name);
-
-    /* send the next floor message */
-    char message[64];
-    char next_floor[32];
-    floor_int_to_char(client->queue[0], (char *)next_floor);
-    snprintf(message, sizeof(message), "FLOOR %s", next_floor);
-
-    send_message(client->fd, message);
-
-    // update the destination floor server side to prevent it from jumping the gun and sending another request
-    floor_int_to_char(client->queue[0], client->destination_floor);
-
-    remove_from_queue(client);
-
-    pthread_mutex_unlock(&clients_mutex);
-  }
-
-  pthread_mutex_lock(&clients_mutex);
-  printf("Queue manager thread for fd %d ending\n", client->fd);
-  pthread_mutex_unlock(&clients_mutex);
-  return NULL;
-}
-
-/* for n number of connected clients there will be
-n number of threads running this function */
-void *handle_client(void *arg)
-{
-  pthread_t queue_manager_thread;
-
-  client_t *client = (client_t *)arg;
-
-  pthread_mutex_lock(&clients_mutex);
-  pthread_cond_init(&client->queue_cond, NULL);
-  int fd = client->fd; // local fd variable to avoid constant mutex locks/unlocks
-  client->queue = malloc(0);
-  client->queue_length = 0;
-  pthread_mutex_unlock(&clients_mutex);
-
-  printf("New client connected with fd %d\n", fd);
-
-  while (system_running && client->connected)
-  {
-    char *message = receive_message(fd);
-    pthread_mutex_lock(&clients_mutex);
-    if (message == NULL)
-    {
-      client->connected = 0;
-    }
-    else if (strncmp(message, "CAR", 3) == 0)
-    {
-      /* parse in the client's info */
-      handle_received_car_message(client, message);
-      printf("New car connected: %s %s %s\n", client->name, client->lowest_floor, client->highest_floor);
-      /* create the queue manager thread */
-      pthread_create(&queue_manager_thread, NULL, queue_manager, (void *)client);
-      /* set the client's type */
-      client->type = IS_CAR;
-    }
-    else if (strncmp(message, "STATUS", 6) == 0)
-    {
-      handle_received_status_message(client, message);
-      printf("Received status message from %s: %s %s %s\n", client->name, client->status, client->current_floor, client->destination_floor);
-    }
-    else if (strncmp(message, "CALL", 4) == 0)
-    {
-      client->type = IS_CALL;
-      int source_floor, destination_floor;
-      extract_call_floors(message, &source_floor, &destination_floor);
-      printf("Received call message for %d-%d\n", source_floor, destination_floor);
-      char chosen_car[64];
-      int found = find_car_for_floor(&source_floor, &destination_floor, clients, client_count, chosen_car);
-      if (!found)
-      {
-        send_message(fd, "UNAVAILABLE");
-      }
-      else
-      {
-        printf("%s can service this request\n", chosen_car);
-        char response[68];
-        snprintf(response, sizeof(response), "Car %s", chosen_car);
-        send_message(fd, response);
-      }
-
-      /* kill the thread since it's a call pad and doesn't need to stay connected */
-      client->connected = 0;
-    }
-    else if (strcmp(message, "INDIVIDUAL SERVICE") == 0)
-    {
-      printf("Car %s is in %s\n", client->name, message);
-    }
-    else if (strcmp(message, "EMERGENCY") == 0)
-    {
-      printf("Car %s is in %s\n", client->name, message);
-    }
-    pthread_mutex_unlock(&clients_mutex);
-  }
-
-  /* wait for the queue manager thread to finish then clean everything up */
-  if (client->type == IS_CAR)
-  {
-    /* signal to the queue manager thread to exit */
-    printf("Signalling queue manager thread to end\n");
-    pthread_mutex_lock(&clients_mutex);
-    client->connected = 0;
-    pthread_cond_signal(&client->queue_cond);
-    pthread_mutex_unlock(&clients_mutex);
-
-    pthread_join(queue_manager_thread, NULL);
-  }
-
-  printf("fd %d handler thread cleaning up\n", fd);
-  pthread_mutex_lock(&clients_mutex);
-  remove_client(client, &clients, &client_count);
-  pthread_mutex_unlock(&clients_mutex);
-
-  printf("fd %d handler thread ending\n", fd);
-  close(fd);
-  return NULL;
-}
-
-void thread_cleanup(int signal)
-{
-  system_running = 0;
-}
+/* function declarations */
+void *queue_manager(void *arg);  // manages the queue for each connected client_t and sends FLOOR messages
+void *client_handler(void *arg); // manages the incoming messages for each connected client_t and updates its info
+void system_shutdown(int sig);   // handle CTRL + C
 
 int main(void)
 {
-  signal(SIGINT, thread_cleanup);
+  signal(SIGINT, system_shutdown);
 
-  /* create the empty array of clients */
   clients = malloc(0);
-  client_count = 0;
 
-  /* startup the server and make non-blocking */
+  /* start up the server and make non-blocking */
   int serverFd = create_server();
   int flags = fcntl(serverFd, F_GETFL, 0);
   fcntl(serverFd, F_SETFL, flags | O_NONBLOCK);
@@ -191,7 +40,7 @@ int main(void)
   struct sockaddr clientaddr;
   socklen_t clientaddr_len;
 
-  /* for each new connected client, handle them on a thread */
+  /* for each new connected client, handle them in a thread */
   int new_socket = -1;
   while (system_running)
   {
@@ -213,23 +62,146 @@ int main(void)
 
       /* create the handler thread */
       pthread_t client_handler_thread;
-      pthread_create(&client_handler_thread, NULL, handle_client, new_client);
+      pthread_create(&client_handler_thread, NULL, client_handler, new_client);
     }
   }
 
-  /* free each individual client_t */
-  printf("Freeing client_t objects\n");
-  for (int index = 0; index < client_count; index++)
-  {
-    client_t *current = (client_t *)clients[index];
-    free(current->queue);
-    free(current);
-  }
-  /* and free the array of pointers to the clients array */
-  printf("Freeing the clients array\n");
-  free(clients);
-  printf("Closing socket\n");
-  close(serverFd);
-
   return 0;
+}
+
+void system_shutdown(int sig)
+{
+  system_running = 0;
+}
+
+void *client_handler(void *arg)
+{
+  pthread_t queue_manager_thread;
+
+  client_t *client = (client_t *)arg;
+
+  pthread_mutex_lock(&clients_mutex);
+  pthread_cond_init(&client->queue_cond, NULL);
+  int fd = client->fd; // local variable to avoid constant mutex locking/unlocking
+  client->queue = malloc(0);
+  client->queue_length = 0;
+  printf("New client connected with fd %d\n", client->fd);
+  pthread_mutex_unlock(&clients_mutex);
+
+  while (system_running && client->connected)
+  {
+    char *message = receive_message(fd);
+    pthread_mutex_lock(&clients_mutex);
+    /* client disconnected */
+    if (message == NULL)
+    {
+      pthread_mutex_unlock(&clients_mutex);
+      break;
+    }
+    /* new car connected */
+    else if (strncmp(message, "CAR", 3) == 0)
+    {
+      handle_received_car_message(client, message);
+      printf("New car connected: %s %s %s\n", client->name, client->lowest_floor, client->highest_floor);
+      pthread_create(&queue_manager_thread, NULL, queue_manager, (void *)client);
+      client->type = IS_CAR;
+    }
+    /* received status message */
+    else if (strncmp(message, "STATUS", 6) == 0)
+    {
+      handle_received_status_message(client, message);
+      printf("Received status message from %s: %s %s %s\n", client->name, client->status, client->current_floor, client->destination_floor);
+    }
+    /* call pad connected */
+    else if (strncmp(message, "CALL", 4) == 0)
+    {
+      handle_received_call_message(client, message, clients, &client_count);
+      /* call pads don't need to stay connected so thread can end */
+      pthread_mutex_unlock(&clients_mutex);
+      break;
+    }
+    /* car in service mode or emergency mode */
+    else if (strcmp(message, "INDIVIDUAL SERVICE") == 0 || strcmp(message, "EMERGENCY") == 0)
+    {
+      printf("Car %s is in %s\n", client->name, message);
+    }
+
+    pthread_mutex_unlock(&clients_mutex);
+  }
+
+  /* wait for the queue manager thread to end if it was a car that was connected */
+  if (client->type == IS_CAR)
+  {
+    pthread_mutex_lock(&clients_mutex);
+    client->connected = 0;
+    pthread_cond_signal(&client->queue_cond);
+    pthread_mutex_unlock(&clients_mutex);
+
+    pthread_join(queue_manager_thread, NULL);
+  }
+
+  pthread_mutex_lock(&clients_mutex);
+  printf("Client handler thread for %s ending\n", client->name);
+  remove_client(client, &clients, &client_count);
+  pthread_mutex_unlock(&clients_mutex);
+
+  close(fd);
+  return NULL;
+}
+
+void *queue_manager(void *arg)
+{
+  client_t *client = arg;
+
+  while (system_running && client->connected)
+  {
+    pthread_mutex_lock(&clients_mutex);
+
+    while (
+        client->connected && // the client is connected
+
+        (strcmp(client->current_floor, client->destination_floor) != 0 || // the current floor isn't the destination floor
+         strcmp(client->status, "Closed") != 0 ||                         // the doors are not closed
+         client->queue_length == 0)                                       // the queue is empty
+    )
+    {
+      pthread_cond_wait(&client->queue_cond, &clients_mutex);
+    }
+
+    /* if client disconnects, end the thread */
+    if (client->connected == 0)
+    {
+      pthread_mutex_unlock(&clients_mutex);
+      break;
+    }
+
+    /* once the client's current floor hits the first queue value, then remove from the queue */
+    char recent_queue_char[4];
+    floor_int_to_char(client->queue[0], (char *)recent_queue_char);
+    if (strcmp(recent_queue_char, client->current_floor) == 0)
+    {
+      remove_from_queue(client);
+    }
+
+    /* otherwise, send the next floor request to the client */
+    printf("Car %s ready - sending request to floor %d\n", client->name, client->queue[0]);
+
+    char message[64];
+    char next_floor[32];
+    floor_int_to_char(client->queue[0], (char *)next_floor);
+    snprintf(message, sizeof(message), "FLOOR %s", next_floor);
+    send_message(client->fd, message);
+
+    /* update the destination floor and status server side to prevent the while loop from sending another request too quickly */
+    floor_int_to_char(client->queue[0], client->destination_floor);
+    strcpy(client->status, "Opening");
+
+    pthread_mutex_unlock(&clients_mutex);
+  }
+
+  /* upon thread end */
+  pthread_mutex_lock(&clients_mutex);
+  printf("Queue manager thread for %s ending\n", client->name);
+  pthread_mutex_unlock(&clients_mutex);
+  return NULL;
 }

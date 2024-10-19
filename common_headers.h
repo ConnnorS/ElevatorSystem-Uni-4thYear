@@ -1,4 +1,8 @@
-#include <stdint.h>
+#define SHM_NAME_LEN 64
+#define MESSAGE_LEN 128
+#define OPERATION_LEN 12
+#define NUM_OPERATIONS 7
+#define FLOOR_LEN 4
 
 /* struct definitions */
 typedef struct
@@ -16,5 +20,3 @@ typedef struct
   uint8_t individual_service_mode; // 1 if in individual service mode, else 0
   uint8_t emergency_mode;          // 1 if in emergency mode, else 0
 } car_shared_mem;
-
-int verify_operation(char *operation);
