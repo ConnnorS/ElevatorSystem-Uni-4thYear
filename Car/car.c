@@ -335,6 +335,10 @@ void *control_system_receive_handler(void *args)
       char floor_num[4];
       sscanf(message, "%*s %s", floor_num);
       pthread_mutex_lock(&shm_status_ptr->mutex);
+      if (strcmp(floor_num, shm_status_ptr->current_floor) == 0)
+      {
+        shm_status_ptr->open_button = 1;
+      }
       strcpy(shm_status_ptr->destination_floor, floor_num);
       pthread_cond_broadcast(&shm_status_ptr->cond);
       pthread_mutex_unlock(&shm_status_ptr->mutex);
