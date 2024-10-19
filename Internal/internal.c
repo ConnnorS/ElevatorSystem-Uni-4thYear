@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 // threads
 #include <pthread.h>
 // shared memory
@@ -9,8 +10,27 @@
 #include <fcntl.h>
 #include <unistd.h>
 // my functions
-#include "internal_helpers.h"
 #include "../type_conversions.h"
+
+/* struct definitions */
+typedef struct
+{
+  pthread_mutex_t mutex;           // Locked while accessing struct contents
+  pthread_cond_t cond;             // Signalled when the contents change
+  char current_floor[4];           // C string in the range B99-B1 and 1-999
+  char destination_floor[4];       // Same format as above
+  char status[8];                  // C string indicating the elevator's status
+  uint8_t open_button;             // 1 if open doors button is pressed, else 0
+  uint8_t close_button;            // 1 if close doors button is pressed, else 0
+  uint8_t door_obstruction;        // 1 if obstruction detected, else 0
+  uint8_t overload;                // 1 if overload detected
+  uint8_t emergency_stop;          // 1 if stop button has been pressed, else 0
+  uint8_t individual_service_mode; // 1 if in individual service mode, else 0
+  uint8_t emergency_mode;          // 1 if in emergency mode, else 0
+} car_shared_mem;
+
+
+int verify_operation(char *operation);
 
 /* {file} {car name} {operation} */
 int main(int argc, char **argv)
@@ -29,7 +49,7 @@ int main(int argc, char **argv)
 
   if (verify_operation((char *)operation) == 0)
   {
-    printf("Invalid operation\n");
+    printf("Invalid operation.\n");
     exit(1);
   }
 
@@ -137,5 +157,18 @@ int main(int argc, char **argv)
 
   munmap(shm_status_ptr, sizeof(car_shared_mem));
 
+  return 0;
+}
+
+int verify_operation(char *operation)
+{
+  const char operations[7][12] = {"open", "close", "stop", "service_on", "service_off", "up", "down"};
+  for (int i = 0; i < 7; i++)
+  {
+    if (strcmp(operation, operations[i]) == 0)
+    {
+      return 1;
+    }
+  }
   return 0;
 }
