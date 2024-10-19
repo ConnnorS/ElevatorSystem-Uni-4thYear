@@ -100,10 +100,27 @@ int floors_are_in_range(int sourceFloor, int destinationFloor, int lowestFloor, 
          (destinationFloor >= lowestFloor && destinationFloor <= highestFloor);
 }
 
+void add_floor_to_queue(int **queue, int *queue_length, int *floor)
+{
+  /* check if the floor is already in the queue */
+  for (int index = 0; index < *queue_length; index++)
+  {
+    if ((*queue)[index] == *floor)
+      return;
+  }
+
+  /* if not, add the floor */
+  *queue_length += 1;
+  *queue = realloc(*queue, sizeof(int) * (*queue_length));
+  (*queue)[*queue_length - 1] = *floor;
+}
+
 /* finds the fd of the car which can service the floors then adds them to the queue */
 int find_car_for_floor(int *source_floor, int *destination_floor, client_t **clients, int *client_count, char *chosen_car)
 {
   int found = 0;
+  client_t **options = malloc(0);
+  int options_count = 0;
   client_t *current;
   /* find a client which can service the request */
   for (int index = 0; index < *client_count; index++)
@@ -112,22 +129,34 @@ int find_car_for_floor(int *source_floor, int *destination_floor, client_t **cli
     int current_lowest_floor_int = floor_char_to_int(current->lowest_floor);
     int current_highest_floor_int = floor_char_to_int(current->highest_floor);
     int can_service = floors_are_in_range(*source_floor, *destination_floor, current_lowest_floor_int, current_highest_floor_int);
-    /* if the client is a car and can service the range of floors */
+    /* find the clients which can service this request */
     if (current->type == IS_CAR && can_service)
     {
-      strcpy(chosen_car, current->name);
       found = 1;
-      break;
+      /* add the client to our list of options */
+      options_count += 1;
+      options = realloc(options, sizeof(client_t *) * options_count);
+      options[options_count - 1] = current;
     }
   }
 
-  /* if found, add the floors to their queue */
   if (found)
   {
-    current->queue_length += 2;
-    current->queue = realloc(current->queue, sizeof(int) * (current->queue_length));
-    current->queue[current->queue_length - 2] = *source_floor;
-    current->queue[current->queue_length - 1] = *destination_floor;
+    /* find the car with the smallest queue to minimise disruptions */
+    current = options[0];
+    for (int index = 1; index < options_count; index++)
+    {
+      if (options[index]->queue_length < current->queue_length)
+      {
+        current = options[index];
+      }
+    }
+
+    strcpy(chosen_car, current->name);
+
+    /* add the floors to their queue */
+    add_floor_to_queue(&current->queue, &current->queue_length, source_floor);
+    add_floor_to_queue(&current->queue, &current->queue_length, destination_floor);
 
     // /* FOR TESTING - REMOVE LATER */
     printf("Car %s\'s queue of length %d: ", current->name, current->queue_length);
@@ -137,10 +166,11 @@ int find_car_for_floor(int *source_floor, int *destination_floor, client_t **cli
     }
     printf("\n");
 
-    // signal the watching queue thread to wake up
+    /* signal the watching queue thread to wake up */
     pthread_cond_signal(&current->queue_cond);
   }
 
+  free(options);
   return found;
 }
 
