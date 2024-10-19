@@ -162,6 +162,8 @@ int main(int argc, char **argv)
     /* if the open button is pressed */
     else if (shm_status_ptr->open_button == 1)
     {
+      shm_status_ptr->open_button = 0;
+
       if (strcmp(shm_status_ptr->status, "Open") == 0)
       {
         pthread_mutex_unlock(&shm_status_ptr->mutex);
@@ -182,12 +184,12 @@ int main(int argc, char **argv)
         pthread_mutex_lock(&shm_status_ptr->mutex);
         open_doors(shm_status_ptr);
       }
-
-      shm_status_ptr->open_button = 0;
     }
     /* if the close button is pressed */
     else if (shm_status_ptr->close_button == 1)
     {
+      shm_status_ptr->close_button = 0;
+
       if (strcmp(shm_status_ptr->status, "Open") == 0)
       {
         closing_doors(shm_status_ptr, &delay_ms);
@@ -198,7 +200,6 @@ int main(int argc, char **argv)
 
         close_doors(shm_status_ptr);
       }
-      shm_status_ptr->close_button = 0;
     }
     /* if dest is different to current */
     else if (strcmp(shm_status_ptr->current_floor, shm_status_ptr->destination_floor) != 0)
