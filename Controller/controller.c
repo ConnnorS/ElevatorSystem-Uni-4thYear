@@ -175,6 +175,14 @@ void *queue_manager(void *arg)
       break;
     }
 
+    /* once the client's current floor hits the first queue value, then remove from the queue */
+    char recent_queue_char[4];
+    floor_int_to_char(client->queue[0], (char *)recent_queue_char);
+    if (strcmp(recent_queue_char, client->current_floor) == 0)
+    {
+      remove_from_queue(client);
+    }
+
     /* otherwise, send the next floor request to the client */
     printf("Car %s ready - sending request to floor %d\n", client->name, client->queue[0]);
 
@@ -187,8 +195,6 @@ void *queue_manager(void *arg)
     /* update the destination floor and status server side to prevent the while loop from sending another request too quickly */
     floor_int_to_char(client->queue[0], client->destination_floor);
     strcpy(client->status, "Opening");
-
-    remove_from_queue(client);
 
     pthread_mutex_unlock(&clients_mutex);
   }

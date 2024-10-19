@@ -103,18 +103,40 @@ int floors_are_in_range(int sourceFloor, int destinationFloor, int lowestFloor, 
          (destinationFloor >= lowestFloor && destinationFloor <= highestFloor);
 }
 
-void add_floor_to_queue(int **queue, int *queue_length, int *floor, int *call_direction)
+void append_floor(client_t *client, int *floor)
 {
-  /* check if the floor is already in the queue */
-  for (int index = 0; index < *queue_length; index++)
+  /* only append if floor isn't in queue */
+  for (int index = 0; index < client->queue_length; index++)
   {
-    if ((*queue)[index] == *floor)
+    if (client->queue[index] == *floor)
+    {
       return;
+    }
   }
-  
-  *queue_length += 1;
-  *queue = realloc(*queue, sizeof(int) * (*queue_length));
-  (*queue)[*queue_length - 1] = *floor;
+  client->queue_length += 1;
+  client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
+  client->queue[client->queue_length - 1] = *floor;
+}
+
+void add_floors_to_queue(client_t *client, int *source_floor, int *destination_floor)
+{
+  /* if empty queue - just add in like usual */
+  if (client->queue_length == 0)
+  {
+    append_floor(client, source_floor);
+    append_floor(client, destination_floor);
+    return;
+  }
+
+  /* if either floor won't fit in the range of the queue they'll need to be appended */
+  if (!floors_are_in_range(*source_floor, *destination_floor, client->queue[0], client->queue[client->queue_length - 1]))
+  {
+    append_floor(client, source_floor);
+    append_floor(client, destination_floor);
+    return;
+  }
+
+  /* if both will fit in the range, then we'll add them in while sorting the queue accordingly */
 }
 
 /* finds the fd of the car which can service the floors then adds them to the queue */
@@ -156,12 +178,8 @@ int find_car_for_floor(int *source_floor, int *destination_floor, client_t **cli
 
     strcpy(chosen_car, current->name);
 
-    /* determine the direction of the floors */
-    int direction = *source_floor < *destination_floor ? UP : DOWN;
-
     /* add the floors to their queue */
-    add_floor_to_queue(&current->queue, &current->queue_length, source_floor, &direction);
-    add_floor_to_queue(&current->queue, &current->queue_length, destination_floor, &direction);
+    add_floors_to_queue(current, source_floor, destination_floor);
 
     // /* FOR TESTING - REMOVE LATER */
     printf("Car %s\'s queue of length %d: ", current->name, current->queue_length);
@@ -226,6 +244,7 @@ void remove_from_queue(client_t *client)
   client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
 }
 
+/* remove the specified client from the queue */
 void remove_client(client_t *client, client_t ***clients, int *client_count)
 {
   if (*client_count > 1)
