@@ -4,13 +4,17 @@
 
 Violation of Rule 20.9 - "The input/output library <stdio.h> shall not be used in production
 code."
-  - the stdio.h library is required for printf() functions to display error messages to the user.
+  - the stdio.h library is required for printf() functions to display error messages to the user
   - in a real production environment, a safer alternative might be writing to a log file
+  - however, these are requirements in the assessment piece's specification and are checking in the
+  testing files
 
 Violation of Rule 20.8 - "The signal handling facilities of <signal.h> should not be used in production code."
   - the signal handling support is necessary for safe manual project termination
   - as this simulates a real elevator system, the safety system can only terminate with CTRL + C
   - additionally, if the system is terminated with CTRL + C it needs to remain complaint and clean up memory
+  - in a real elevator system, the safety system might be constantly running and only terminate when power is
+  cut to the system or the elevator is shut down as a whole system
 */
 
 #include <stdio.h>
@@ -21,31 +25,17 @@ Violation of Rule 20.8 - "The signal handling facilities of <signal.h> should no
 #include <unistd.h>
 #include <signal.h>
 
-typedef struct
-{
-  pthread_mutex_t mutex;           // Locked while accessing struct contents
-  pthread_cond_t cond;             // Signalled when the contents change
-  char current_floor[4];           // C string in the range B99-B1 and 1-999
-  char destination_floor[4];       // Same format as above
-  char status[8];                  // C string indicating the elevator's status
-  uint8_t open_button;             // 1 if open doors button is pressed, else 0
-  uint8_t close_button;            // 1 if close doors button is pressed, else 0
-  uint8_t door_obstruction;        // 1 if obstruction detected, else 0
-  uint8_t overload;                // 1 if overload detected
-  uint8_t emergency_stop;          // 1 if stop button has been pressed, else 0
-  uint8_t individual_service_mode; // 1 if in individual service mode, else 0
-  uint8_t emergency_mode;          // 1 if in emergency mode, else 0
-} car_shared_mem;
+#include "../common_headers.h"
 
 /* global variables */
-car_shared_mem *shm_status_ptr = NULL;
-int system_running = 1;
+static car_shared_mem *shm_status_ptr = NULL;
+static int system_running = 1;
 
 /* function definitions */
-int data_consistent(car_shared_mem *shm_ptr);
-void exit_cleanup(int signal);
-int check_floor_contents(const char *floor);
-int check_floor_length(const char *floor);
+static int data_consistent(car_shared_mem *shm_ptr);
+static void exit_cleanup(int signal);
+static int check_floor_contents(const char *floor);
+static int check_floor_length(const char *floor);
 
 int main(int argc, char **argv)
 {
@@ -59,19 +49,35 @@ int main(int argc, char **argv)
   signal(SIGINT, exit_cleanup);
 
   /* open the shared memory object */
-  char shm_status_name[64];
-  snprintf(shm_status_name, sizeof(shm_status_name), "/car%s", argv[1]);
+  if (argv[1] == NULL)
+  {
+    printf("Invalid car name\n");
+    return 1;
+  }
+  char shm_status_name[64] = "";
+  if (snprintf(shm_status_name, sizeof(shm_status_name), "/car%s", argv[1]) == -1)
+  {
+    printf("Error parsing car name\n");
+    return 1;
+  }
 
   int shm_status_fd = shm_open(shm_status_name, 2, 0666);
   if (shm_status_fd == -1)
   {
-    printf("Unable to access car %s.\n", argv[1]);
+    if (argv[1] == NULL)
+    {
+      printf("Unable to access car\n");
+    }
+    else
+    {
+      printf("Unable to access car %s.\n", argv[1]);
+    }
     return 1;
   }
 
   /* map the shared memory */
   shm_status_ptr = mmap(0, sizeof(car_shared_mem), (int)0x2, (int)0x01, shm_status_fd, 0);
-  if (shm_status_ptr == MAP_FAILED || shm_status_ptr == NULL)
+  if (shm_status_ptr == MAP_FAILED)
   {
     perror("mmap failed");
     close(shm_status_fd);
@@ -81,17 +87,26 @@ int main(int argc, char **argv)
   /* constantly check for updates */
   while (system_running)
   {
-    pthread_mutex_lock(&shm_status_ptr->mutex);
+    if (pthread_mutex_lock(&shm_status_ptr->mutex) != 0)
+    {
+      printf("Mutex lock failed\n");
+      return 1;
+    }
 
     /* wait while ... */
-    while (shm_status_ptr->door_obstruction == 0 && // there is no door obstruction
-           shm_status_ptr->emergency_stop == 0 &&   // emergency stop hasn't been pressed
-           shm_status_ptr->overload == 0 &&         // the overload sensor hasn't been tripped
-           data_consistent(shm_status_ptr) &&       // the car's status is valid
-           system_running                           // the system is still running
+    while (shm_status_ptr->door_obstruction == 0 && /* there is no door obstruction */
+           shm_status_ptr->emergency_stop == 0 &&   /* emergency stop hasn't been pressed */
+           shm_status_ptr->overload == 0 &&         /* the overload sensor hasn't been tripped */
+           data_consistent(shm_status_ptr) &&       /* the car's status is valid */
+           system_running                           /* the system is still running */
     )
     {
-      pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex);
+      if (pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex) != 0)
+      {
+        printf("Pthread wait failed\n");
+        pthread_mutex_unlock(&shm_status_ptr->mutex);
+        return 1;
+      }
     }
 
     /* obstruction while doors closing */
@@ -117,9 +132,22 @@ int main(int argc, char **argv)
       printf("Data consistency error!\n");
       shm_status_ptr->emergency_mode = 1;
     }
+    /* Rule 14.10 - always requires an else statement */
+    else
+    {
+      if (shm_status_ptr == NULL)
+      {
+        printf("Unexpected condition detected. SHM pointer is null\n");
+        return 1;
+      }
+    }
 
     pthread_cond_broadcast(&shm_status_ptr->cond);
-    pthread_mutex_unlock(&shm_status_ptr->mutex);
+    if (pthread_mutex_unlock(&shm_status_ptr->mutex) != 0)
+    {
+      printf("Mutex unlock failed\n");
+      return 1;
+    }
   }
 
   /* un map and close memory */
@@ -199,9 +227,11 @@ int data_consistent(car_shared_mem *shm_ptr)
 
 int check_floor_contents(const char *floor)
 {
+  int valid = 1;
+
   if (floor == NULL)
   {
-    return 0;
+    valid = 0;
   }
 
   /* start one character over if basement floor */
@@ -216,19 +246,21 @@ int check_floor_contents(const char *floor)
   {
     if ((unsigned char)floor[index] < '0' || (unsigned char)floor[index] > '9')
     {
-      return 0;
+      valid = 0;
     }
     index++;
   }
 
-  return 1;
+  return valid;
 }
 
 int check_floor_length(const char *floor)
 {
+  int valid = 1;
+
   if (floor == NULL)
   {
-    return 0;
+    valid = 0;
   }
 
   int index = 0;
@@ -238,11 +270,11 @@ int check_floor_length(const char *floor)
     index++;
     if (index > 4)
     {
-      return 0;
+      valid = 0;
     }
   }
 
-  return 1;
+  return valid;
 }
 
 void exit_cleanup(int signal)

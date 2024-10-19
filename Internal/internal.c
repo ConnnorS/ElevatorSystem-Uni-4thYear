@@ -11,24 +11,7 @@
 #include <unistd.h>
 // my functions
 #include "../type_conversions.h"
-
-/* struct definitions */
-typedef struct
-{
-  pthread_mutex_t mutex;           // Locked while accessing struct contents
-  pthread_cond_t cond;             // Signalled when the contents change
-  char current_floor[4];           // C string in the range B99-B1 and 1-999
-  char destination_floor[4];       // Same format as above
-  char status[8];                  // C string indicating the elevator's status
-  uint8_t open_button;             // 1 if open doors button is pressed, else 0
-  uint8_t close_button;            // 1 if close doors button is pressed, else 0
-  uint8_t door_obstruction;        // 1 if obstruction detected, else 0
-  uint8_t overload;                // 1 if overload detected
-  uint8_t emergency_stop;          // 1 if stop button has been pressed, else 0
-  uint8_t individual_service_mode; // 1 if in individual service mode, else 0
-  uint8_t emergency_mode;          // 1 if in emergency mode, else 0
-} car_shared_mem;
-
+#include "../common_headers.h"
 
 int verify_operation(char *operation);
 
@@ -42,8 +25,8 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  char shm_status_name[64];
-  char operation[12];
+  char shm_status_name[SHM_NAME_LEN];
+  char operation[OPERATION_LEN];
   snprintf(shm_status_name, sizeof(shm_status_name), "/car%s", argv[1]);
   strcpy((char *)operation, argv[2]);
 
@@ -81,7 +64,7 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-    /* if the up or down command is entered but the car is moving */
+  /* if the up or down command is entered but the car is moving */
   if ((strcmp(operation, "up") == 0 || strcmp(operation, "down") == 0) && strcmp(shm_status_ptr->status, "Between") == 0)
   {
     printf("Operation not allowed while elevator is moving.\n");
@@ -137,19 +120,6 @@ int main(int argc, char **argv)
     } while (destination_int == 0); // ensure the floor does not hit 0
     floor_int_to_char(destination_int, shm_status_ptr->destination_floor);
   }
-  /* FOR TESTING REMOVE LATER */
-  else if (strcmp(operation, "emrg") == 0)
-  {
-    shm_status_ptr->emergency_stop = 1;
-  }
-  else if (strcmp(operation, "obs_on") == 0)
-  {
-    shm_status_ptr->door_obstruction = 1;
-  }
-  else if (strcmp(operation, "obs_off") == 0)
-  {
-    shm_status_ptr->door_obstruction = 0;
-  }
 
   /* finally, signal the cond and exit */
   pthread_cond_broadcast(&shm_status_ptr->cond);
@@ -162,7 +132,7 @@ int main(int argc, char **argv)
 
 int verify_operation(char *operation)
 {
-  const char operations[7][12] = {"open", "close", "stop", "service_on", "service_off", "up", "down"};
+  const char operations[NUM_OPERATIONS][12] = {"open", "close", "stop", "service_on", "service_off", "up", "down"};
   for (int i = 0; i < 7; i++)
   {
     if (strcmp(operation, operations[i]) == 0)
