@@ -86,65 +86,159 @@ void handle_received_status_message(client_t *client, char *message)
   pthread_cond_signal(&client->queue_cond); // signal that the floors have changed and the queue thread might need to act
 }
 
-/* extracts the call pad's floors and converts them to an integer for easier comparison */
-void extract_call_floors(char *message, int *source_floor, int *destination_floor)
-{
-  char source[4];
-  char destination[4];
-  sscanf(message, "%*s %3s %3s", source, destination);
-
-  *source_floor = floor_char_to_int(source);
-  *destination_floor = floor_char_to_int(destination);
-}
-
 int floors_are_in_range(int sourceFloor, int destinationFloor, int lowestFloor, int highestFloor)
 {
   return (sourceFloor >= lowestFloor && sourceFloor <= highestFloor) &&
          (destinationFloor >= lowestFloor && destinationFloor <= highestFloor);
 }
 
-void append_floor(client_t *client, int *floor)
+void append_floors(client_t *client, int *source_floor, int *destination_floor, int *direction)
 {
-  /* only append if floor isn't in queue */
-  for (int index = 0; index < client->queue_length; index++)
+  char source[5];
+  char destination[5];
+
+  /* determine the direction and add the floors */
+  if (*direction == UP)
   {
-    if (client->queue[index] == *floor)
-    {
-      return;
-    }
+    snprintf(source, sizeof(source), "U%d", *source_floor);
+    snprintf(destination, sizeof(destination), "U%d", *destination_floor);
   }
-  client->queue_length += 1;
-  client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
-  client->queue[client->queue_length - 1] = *floor;
+  else
+  {
+    snprintf(source, sizeof(source), "D%d", *source_floor);
+    snprintf(destination, sizeof(destination), "D%d", *destination_floor);
+  }
+
+  /* append the floors to the end of the queue */
+  char *src_ptr = malloc(strlen(source) + 1);
+  char *dst_ptr = malloc(strlen(destination) + 1);
+  strcpy(src_ptr, source);
+  strcpy(dst_ptr, destination);
+
+  client->queue_length += 2;
+  client->queue = realloc(client->queue, sizeof(char *) * client->queue_length);
+  client->queue[client->queue_length - 2] = src_ptr;
+  client->queue[client->queue_length - 1] = dst_ptr;
 }
 
-void add_floors_to_queue(client_t *client, int *source_floor, int *destination_floor)
+void add_floor_at_index(client_t *client, char *floor, int *index, int *direction)
 {
-  /* if empty queue - just add in like usual */
+  printf("Inserting %s at index %d\n", floor, *index);
+  /* allocate memory for the new floor */
+  char new_floor[5];
+  if (*direction == UP)
+  {
+    snprintf(new_floor, sizeof(new_floor), "U%s", floor);
+  }
+  else
+  {
+    snprintf(new_floor, sizeof(new_floor), "D%s", floor);
+  }
+
+  char *new_floor_ptr = malloc(strlen(new_floor) + 1);
+  strcpy(new_floor_ptr, new_floor);
+
+  /* allocate more memory for the queue*/
+  client->queue_length += 1;
+  client->queue = realloc(client->queue, sizeof(char *) * client->queue_length);
+
+  /* shift all the values to the right at index */
+  for (int end = client->queue_length - 1; end > *index; end--)
+  {
+    client->queue[end] = client->queue[end - 1];
+  }
+  client->queue[*index] = new_floor_ptr;
+}
+
+/* tries to insert a floor at a specific block index
+returns 1 if successful, returns 0 otherwise */
+int find_block_index_for_floor(client_t *client, int *block_index, char *floor_char, int *floor_int, int *direction)
+{
+  char car_current_floor[4];
+  strcpy(car_current_floor, client->current_floor);
+  int car_current_floor_int = floor_char_to_int(car_current_floor);
+
+  for (; *block_index < client->queue_length; *block_index++)
+  {
+    /* if we've got to the end of the block, return 0 */
+    if ((client->queue[*block_index][0] == 'U' && *direction == DOWN) || (client->queue[*block_index][0] == 'D' && *direction == UP))
+    {
+      printf("We've hit the end of the block at index %d - appending floors\n", *block_index);
+      return 0;
+    }
+
+    /* otherwise, find the spot to insert the floor */
+    char queue_current[4];
+    strcpy(queue_current, client->queue[*block_index] + 1);
+    int queue_current_int = floor_char_to_int(queue_current);
+
+    if (queue_current_int == *floor_int)
+    {
+      return 1; // floor already in queue
+    }
+
+    /* find the right index to insert the floor considering the car's current floor */
+    if (
+        (*direction == UP && *floor_int > car_current_floor_int && *floor_int < queue_current_int) ||
+        (*direction == DOWN && *floor_int < car_current_floor_int && *floor_int > queue_current_int))
+    {
+      add_floor_at_index(client, floor_char, block_index, direction);
+      return 1;
+    }
+  }
+  return 0;
+}
+
+void add_floors_to_queue(client_t *client, char *source, int *source_int, char *destination, int *destination_int)
+{
+  /* work out the direction of the request */
+  int direction = *source_int < *destination_int ? UP : DOWN;
+
+  /* if the queue is empty, just append the floors */
   if (client->queue_length == 0)
   {
-    append_floor(client, source_floor);
-    append_floor(client, destination_floor);
+    printf("Queue is empty - appending floors\n");
+    append_floors(client, source_int, destination_int, &direction);
     return;
   }
 
-  /* if either floor won't fit in the range of the queue they'll need to be appended */
-  if (!floors_are_in_range(*source_floor, *destination_floor, client->queue[0], client->queue[client->queue_length - 1]))
+  /* if not, find the matching up or down block */
+  int index = 0;
+  int found_block = 0;
+  for (; index < client->queue_length; index++)
   {
-    append_floor(client, source_floor);
-    append_floor(client, destination_floor);
+    /* if going up - stop at the up block or if going down - stop at the down block */
+    if ((client->queue[index][0] == 'U' && direction == UP) || (client->queue[index][0] == 'D' && direction == DOWN))
+    {
+      found_block = 1;
+      break;
+    }
+  }
+
+  /* if we didn't find a block for the index, append them at the end */
+  if (!found_block)
+  {
+    printf("No block found - appending floors\n");
+    append_floors(client, source_int, destination_int, &direction);
     return;
   }
 
-  /* if both will fit in the range, then we'll add them in while sorting the queue accordingly */
+  /* otherwise, find where the floor might fit in the block */
+  if (!find_block_index_for_floor(client, &index, source, source_int, &direction))
+  {
+    append_floors(client, source_int, destination_int, &direction);
+  }
 }
 
 /* finds the fd of the car which can service the floors then adds them to the queue */
-int find_car_for_floor(int *source_floor, int *destination_floor, client_t **clients, int *client_count, char *chosen_car)
+int find_car_for_floor(char *source, char *destination, client_t **clients, int *client_count, char *chosen_car)
 {
   int found = 0;
   client_t **options = malloc(0);
   int options_count = 0;
+
+  int source_floor_int = floor_char_to_int(source);
+  int destination_floor_int = floor_char_to_int(destination);
 
   /* find the clients which can service this request */
   client_t *current;
@@ -153,7 +247,7 @@ int find_car_for_floor(int *source_floor, int *destination_floor, client_t **cli
     current = (client_t *)clients[index];
     int current_lowest_floor_int = floor_char_to_int(current->lowest_floor);
     int current_highest_floor_int = floor_char_to_int(current->highest_floor);
-    int can_service = floors_are_in_range(*source_floor, *destination_floor, current_lowest_floor_int, current_highest_floor_int);
+    int can_service = floors_are_in_range(source_floor_int, destination_floor_int, current_lowest_floor_int, current_highest_floor_int);
     if (current->type == IS_CAR && can_service)
     {
       found = 1;
@@ -179,13 +273,13 @@ int find_car_for_floor(int *source_floor, int *destination_floor, client_t **cli
     strcpy(chosen_car, current->name);
 
     /* add the floors to their queue */
-    add_floors_to_queue(current, source_floor, destination_floor);
+    add_floors_to_queue(current, source, &source_floor_int, destination, &destination_floor_int);
 
     // /* FOR TESTING - REMOVE LATER */
     printf("Car %s\'s queue of length %d: ", current->name, current->queue_length);
     for (int index = 0; index < current->queue_length; index++)
     {
-      printf("%d,", current->queue[index]);
+      printf("%s,", current->queue[index]);
     }
     printf("\n");
 
@@ -202,13 +296,13 @@ void handle_received_call_message(client_t *client, char *message, client_t **cl
 {
   client->type = IS_CALL;
   /* extract data */
-  int source_floor = 0, destination_floor = 0;
-  extract_call_floors(message, &source_floor, &destination_floor);
-  printf("Received call message for %d-%d\n", source_floor, destination_floor);
+  char source[4], destination[4];
+  sscanf(message, "%*s %3s %3s", source, destination);
+  printf("Received call message for %s-%s\n", source, destination);
 
   /* find car to service */
   char chosen_car[64];
-  if (find_car_for_floor(&source_floor, &destination_floor, clients, client_count, chosen_car))
+  if (find_car_for_floor(source, destination, clients, client_count, chosen_car))
   {
     printf("%s can service this request\n", chosen_car);
     char response[68];
@@ -221,27 +315,21 @@ void handle_received_call_message(client_t *client, char *message, client_t **cl
   }
 }
 
-/* helper to initialise the condition variable for each client */
-void initialise_cond(client_t *client)
-{
-  pthread_condattr_t cond_attr;
-  pthread_condattr_init(&cond_attr);
-  pthread_condattr_setpshared(&cond_attr, PTHREAD_PROCESS_SHARED);
-  pthread_cond_init(&client->queue_cond, NULL);
-}
-
 /* remove the most recent floor from the queue */
 void remove_from_queue(client_t *client)
 {
-  /* shift all the values down to overwrite the first value */
-  for (int index = 0; index < client->queue_length; index++)
+  /* free the char */
+  free(client->queue[0]);
+
+  /* shift all the pointers down to overwrite the first value */
+  for (int index = 0; index < client->queue_length - 1; index++)
   {
     client->queue[index] = client->queue[index + 1];
   }
 
-  /* reduce the queue length and realloc memory */
-  client->queue_length--;
-  client->queue = realloc(client->queue, sizeof(int) * client->queue_length);
+  /* reduce the length of the queue */
+  client->queue_length -= 1;
+  client->queue = realloc(client->queue, sizeof(char *) * client->queue_length);
 }
 
 /* remove the specified client from the queue */
