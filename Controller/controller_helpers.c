@@ -183,6 +183,7 @@ void insert_floor_in_block(client_t *client, int *index, int *floor_int, char *f
   }
 
   add_floor_at_index(client, floor, &block_index, direction);
+  pthread_cond_signal(&client->queue_cond);
 }
 
 void add_floors_to_queue(client_t *client, char *source, int *source_int, char *destination, int *destination_int)
@@ -224,10 +225,10 @@ void add_floors_to_queue(client_t *client, char *source, int *source_int, char *
   /* additionally, if any of the floors fall outside the elevator's current floor - append to the end */
   int car_current_floor = floor_char_to_int(client->current_floor);
   if (
-      (direction == UP && *source_int < car_current_floor && *source_int < 0 && car_current_floor < 0) || // 1
-      (direction == UP && *source_int < car_current_floor && *source_int > 0 && car_current_floor > 0) || // 1
+      (direction == UP && *source_int < car_current_floor && *source_int < 0 && car_current_floor < 0) ||   // 1
+      (direction == UP && *source_int < car_current_floor && *source_int > 0 && car_current_floor > 0) ||   // 1
       (direction == DOWN && *source_int > car_current_floor && *source_int > 0 && car_current_floor > 0) || // 1
-      (direction == DOWN && *source_int > car_current_floor && *source_int < 0 && car_current_floor < 0)) // 1
+      (direction == DOWN && *source_int > car_current_floor && *source_int < 0 && car_current_floor < 0))   // 1
   {
     append_floors(client, source_int, destination_int, &direction);
     return;
