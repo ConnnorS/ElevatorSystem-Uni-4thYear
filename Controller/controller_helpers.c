@@ -158,18 +158,18 @@ int find_block_index_for_floor(client_t *client, int *block_index, char *floor_c
   strcpy(car_current_floor, client->current_floor);
   int car_current_floor_int = floor_char_to_int(car_current_floor);
 
-  for (; *block_index < client->queue_length; *block_index++)
+  for (int index = *block_index; index < client->queue_length; index++)
   {
     /* if we've got to the end of the block, return 0 */
-    if ((client->queue[*block_index][0] == 'U' && *direction == DOWN) || (client->queue[*block_index][0] == 'D' && *direction == UP))
+    if ((client->queue[index][0] == 'U' && *direction == DOWN) || (client->queue[index][0] == 'D' && *direction == UP))
     {
-      printf("We've hit the end of the block at index %d - appending floors\n", *block_index);
+      printf("We've hit the end of the block at index %d - appending floors\n", index);
       return 0;
     }
 
     /* otherwise, find the spot to insert the floor */
     char queue_current[4];
-    strcpy(queue_current, client->queue[*block_index] + 1);
+    strcpy(queue_current, client->queue[index] + 1);
     int queue_current_int = floor_char_to_int(queue_current);
 
     if (queue_current_int == *floor_int)
@@ -182,7 +182,7 @@ int find_block_index_for_floor(client_t *client, int *block_index, char *floor_c
         (*direction == UP && *floor_int > car_current_floor_int && *floor_int < queue_current_int) ||
         (*direction == DOWN && *floor_int < car_current_floor_int && *floor_int > queue_current_int))
     {
-      add_floor_at_index(client, floor_char, block_index, direction);
+      add_floor_at_index(client, floor_char, &index, direction);
       return 1;
     }
   }
@@ -210,6 +210,7 @@ void add_floors_to_queue(client_t *client, char *source, int *source_int, char *
     /* if going up - stop at the up block or if going down - stop at the down block */
     if ((client->queue[index][0] == 'U' && direction == UP) || (client->queue[index][0] == 'D' && direction == DOWN))
     {
+      printf("Found block at index %d\n", index);
       found_block = 1;
       break;
     }
@@ -224,10 +225,97 @@ void add_floors_to_queue(client_t *client, char *source, int *source_int, char *
   }
 
   /* otherwise, find where the floor might fit in the block */
-  if (!find_block_index_for_floor(client, &index, source, source_int, &direction))
+  if (
+      !find_block_index_for_floor(client, &index, source, source_int, &direction) ||
+      !find_block_index_for_floor(client, &index, destination, destination_int, &direction))
   {
     append_floors(client, source_int, destination_int, &direction);
   }
+}
+
+void add_floors_to_queue2(client_t *client, char *source, int *source_int, char *destination, int *destination_int)
+{
+  /* work out the direction of the request */
+  int direction = *source_int < *destination_int ? UP : DOWN;
+
+  /* if the queue is empty, just append the floors */
+  if (client->queue_length == 0)
+  {
+    printf("Queue is empty - appending floors\n");
+    append_floors(client, source_int, destination_int, &direction);
+    return;
+  }
+
+  /* if not, find where the floor's up or down block will start */
+  int index = 0;
+  int found_block = 0;
+  for (; index < client->queue_length; index++)
+  {
+    /* if going up - stop at the up block or if going down - stop at the down block */
+    if ((client->queue[index][0] == 'U' && direction == UP) ||
+        (client->queue[index][0] == 'D' && direction == DOWN))
+    {
+      printf("Found block at index %d\n", index);
+      found_block = 1;
+      break;
+    }
+  }
+
+  /* if we didn't find a block - append to start a new block */
+  if (!found_block)
+  {
+    printf("No block found - appending floors\n");
+    append_floors(client, source_int, destination_int, &direction);
+    return;
+  }
+
+  /* otherwise find where in the block the floor is meant to go */
+  int index_src = index;
+  int index_dst = index;
+
+  /* start with the source floor */
+  for (; index_src < client->queue_length; index_src++)
+  {
+    char current_floor[4];
+    strcpy(current_floor, client->queue[index_src] + 1); // strip off the 'U' or 'D'
+    int current_floor_int = floor_char_to_int(current_floor);
+
+    if (current_floor_int == *source_int)
+    {
+      break; // duplicate floor, don't add
+    }
+
+    printf("At index %d comparing %d to %s\n", index_src, *source_int, current_floor);
+    if (
+        (direction == UP && *source_int < current_floor_int) ||
+        (direction == DOWN && *source_int > current_floor_int))
+    {
+      break;
+    }
+  }
+  add_floor_at_index(client, source, &index_src, &direction);
+
+  /* now do destination floor */
+  for (; index_dst < client->queue_length; index_dst++)
+  {
+    char current_floor[4];
+    strcpy(current_floor, client->queue[index_dst] + 1); // strip off the 'U' or 'D'
+    int current_floor_int = floor_char_to_int(current_floor);
+
+    if (current_floor_int == *destination_int)
+    {
+      break; // duplicate floor, don't add
+    }
+
+    printf("At index %d comparing %d to %s\n", index_dst, *destination_int, current_floor);
+    if (
+        (direction == UP && *destination_int < current_floor_int) ||
+        (direction == DOWN && *destination_int > current_floor_int))
+    {
+      break;
+    }
+  }
+  add_floor_at_index(client, destination, &index_dst, &direction);
 }
 
 /* finds the fd of the car which can service the floors then adds them to the queue */
@@ -273,7 +361,7 @@ int find_car_for_floor(char *source, char *destination, client_t **clients, int 
     strcpy(chosen_car, current->name);
 
     /* add the floors to their queue */
-    add_floors_to_queue(current, source, &source_floor_int, destination, &destination_floor_int);
+    add_floors_to_queue2(current, source, &source_floor_int, destination, &destination_floor_int);
 
     // /* FOR TESTING - REMOVE LATER */
     printf("Car %s\'s queue of length %d: ", current->name, current->queue_length);
