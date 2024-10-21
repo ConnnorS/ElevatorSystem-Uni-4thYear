@@ -172,7 +172,7 @@ void *queue_manager(void *arg)
       pthread_cond_wait(&client->queue_cond, &clients_mutex);
     }
 
-    /* if client disconnects, end the thread */
+    /* if client disconnects, end the thread */ 
     if (client->connected == 0)
     {
       pthread_mutex_unlock(&clients_mutex);
