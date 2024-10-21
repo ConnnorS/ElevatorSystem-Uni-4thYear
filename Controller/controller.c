@@ -153,17 +153,21 @@ void *queue_manager(void *arg)
 {
   client_t *client = arg;
 
+  char next_floor[4];
+
   while (system_running && client->connected)
   {
     pthread_mutex_lock(&clients_mutex);
 
+    /* wait while */
     while (
         client->connected && // the client is connected
 
-        (strcmp(client->current_floor, client->destination_floor) != 0 || // the current floor isn't the destination floor
-         strcmp(client->status, "Closed") != 0 ||                         // the doors are not closed
-         client->queue_length == 0)                                       // the queue is empty
-    )
+        (strcmp(client->current_floor, client->destination_floor) != 0 || // the client is not at its destination floor
+         strcmp(client->status, "Closed") != 0 ||                         // the client is not "Opening"
+         client->queue_length == 0) &&                                    // the queue is empty
+
+        (client->queue_length < 1 || strcmp(next_floor, client->queue[0] + 1) == 0))
     {
       pthread_cond_wait(&client->queue_cond, &clients_mutex);
     }
@@ -175,21 +179,31 @@ void *queue_manager(void *arg)
       break;
     }
 
-    char next_floor[4];
-    strcpy(next_floor, client->queue[0] + 1); // remove the 'U' or 'D' from the floor
+    /* if the next floor does not match the first floor in the queue - send a new floor request */
+    if (client->queue_length > 1 && strcmp(next_floor, client->queue[0] + 1) != 0)
+    {
+      printf("Floor change detected - sending new floor\n");
+      char message[16];
+      strcpy(next_floor, client->queue[0] + 1);
+      snprintf(message, sizeof(message), "FLOOR %s", next_floor);
+      send_message(client->fd, message);
+    }
+    /* if the client hits the next floor, the queue is not empty, and the doors are Closed:
+    send the next floor and remove the first floor from the queue */
+    if (strcmp(client->current_floor, next_floor) == 0 &&
+        client->queue_length > 0 &&
+        strcmp(client->status, "Closed") == 0)
+    {
+      char message[16];
+      strcpy(next_floor, client->queue[0] + 1);
+      snprintf(message, sizeof(message), "FLOOR %s", next_floor);
+      send_message(client->fd, message);
 
-    /* otherwise, send the next floor request to the client */
-    printf("Car %s ready - sending request to floor %s\n", client->name, next_floor);
+      remove_from_queue(client);
+    }
 
-    char message[64];
-    snprintf(message, sizeof(message), "FLOOR %s", next_floor);
-    send_message(client->fd, message);
-
-    /* update the destination floor and status server side to prevent the while loop from sending another request too quickly */
+    /* update destination floor server side to prevent while loop from jumping the gun */
     strcpy(client->destination_floor, next_floor);
-    strcpy(client->status, "Opening");
-
-    remove_from_queue(client);
 
     pthread_mutex_unlock(&clients_mutex);
   }
