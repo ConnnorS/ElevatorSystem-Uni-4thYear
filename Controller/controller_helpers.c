@@ -80,6 +80,24 @@ void handle_received_status_message(client_t *client, char *message)
   strcpy(client->status, status);
   strcpy(client->current_floor, current_floor);
   strcpy(client->destination_floor, destination_floor);
+
+  /* calculate the client's current direction */
+  int client_current_int = floor_char_to_int(client->current_floor);
+  int client_destination_int = floor_char_to_int(client->destination_floor);
+
+  if (client_current_int < client_destination_int)
+  {
+    client->direction = UP;
+  }
+  else if (client_current_int > client_destination_int)
+  {
+    client->direction = DOWN;
+  }
+  else
+  {
+    client->direction = STILL;
+  }
+
   pthread_cond_signal(&client->queue_cond); // signal that the floors have changed and the queue thread might need to act
 }
 

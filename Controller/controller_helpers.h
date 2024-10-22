@@ -35,3 +35,4 @@ void handle_received_status_message(client_t *client, char *message);
 void handle_received_call_message(client_t *client, char *message, client_t **clients, int *client_count);
 void remove_from_queue(client_t *client);
 void remove_client(client_t *client, client_t ***clients, int *client_count);
+void calculate_direction(client_t *client);

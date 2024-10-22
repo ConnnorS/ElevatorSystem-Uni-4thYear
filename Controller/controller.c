@@ -196,13 +196,7 @@ void *queue_manager(void *arg)
     {
       remove_from_queue(client);
     }
-
-    /* also work out the current direction of the car */
-    int client_current_int = floor_char_to_int(client->current_floor);
-    int client_destination_int = floor_char_to_int(client->destination_floor);
-    client->direction = client_current_int < client_destination_int ? UP : client_current_int == client_destination_int ? STILL
-                                                                                                                        : DOWN;
-
+    
     pthread_mutex_unlock(&clients_mutex);
   }
 
