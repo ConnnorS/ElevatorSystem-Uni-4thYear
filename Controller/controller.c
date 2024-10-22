@@ -165,7 +165,6 @@ void *queue_manager(void *arg)
 
         /* any of the following are true */
         (strcmp(client->current_floor, client->destination_floor) != 0 || // the client is not at its destination floor
-         strcmp(client->status, "Closed") != 0 ||                         // the client is not "Opening"
          client->queue_length == 0) &&                                    // the queue is empty
 
         /* any of the following are true */
@@ -183,8 +182,10 @@ void *queue_manager(void *arg)
       break;
     }
 
-    /* if the destination floor does not match the first floor in the queue - send a new floor request */
-    if (client->queue_length > 0 && strcmp(client->destination_floor, client->queue[0] + 1) != 0)
+    /* if the destination floor does not match the first floor in the queue - send a new floor request
+    only if the client's doors are "Opening" or "Closed" */
+    if (client->queue_length > 0 && strcmp(client->destination_floor, client->queue[0] + 1) != 0 &&
+        (strcmp(client->status, "Opening") == 0 || strcmp(client->status, "Closed") == 0))
     {
       char message[16];
       strcpy(client->destination_floor, client->queue[0] + 1);
@@ -196,7 +197,7 @@ void *queue_manager(void *arg)
     {
       remove_from_queue(client);
     }
-    
+
     pthread_mutex_unlock(&clients_mutex);
   }
 

@@ -1,6 +1,6 @@
 # Define the compiler and flags
 CC = gcc
-FLAGS = -lpthread -Wall
+FLAGS = -lpthread -Wall -Wpedantic -Wextra -Wshadow -Wformat=2 -Wconversion -Wnull-dereference
 FILES = car call controller internal safety
 
 # ---- ALL ---- #
