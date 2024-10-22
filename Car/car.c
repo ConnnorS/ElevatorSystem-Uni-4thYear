@@ -28,7 +28,7 @@ pthread_t server_receive_handler;
 pthread_t server_send_handler;
 
 /* function declarations */
-void system_shutdown(int signal);
+void system_shutdown();
 void *control_system_send_handler(void *args);
 void *control_system_receive_handler(void *args);
 
@@ -48,7 +48,14 @@ int main(int argc, char **argv)
   char highest_floor_char[4];
   strncpy(lowest_floor_char, argv[2], 4);
   strncpy(highest_floor_char, argv[3], 4);
-  int delay_ms = atoi(argv[4]);
+
+  char *end_ptr;
+  __useconds_t delay_ms = (__useconds_t)strtoul(argv[4], &end_ptr, 10);
+  if (*end_ptr != '\0')
+  {
+    printf("Invalid delay_ms specified\n");
+    return 1;
+  }
 
   /* validate user input */
   int lowest_floor_int = floor_char_to_int(lowest_floor_char);
@@ -236,7 +243,7 @@ void *control_system_send_handler(void *args)
   printf("Control system send thread started\n");
 
   car_thread_data *car = (car_thread_data *)args;
-  int delay_ms = car->delay_ms;
+  __useconds_t delay_ms = car->delay_ms;
 
   /* connect to the control system */
   int socketFd = connect_to_control_system();
@@ -349,7 +356,7 @@ void *control_system_receive_handler(void *args)
 }
 
 /* allows everything to cleanly shut down */
-void system_shutdown(int signal)
+void system_shutdown()
 {
   system_running = 0;
   pthread_mutex_lock(&shm_status_ptr->mutex);

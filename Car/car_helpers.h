@@ -21,7 +21,7 @@ typedef struct
 typedef struct
 {
   int fd;       // file descriptor of the connected server
-  int delay_ms; // the delay of the car
+  __useconds_t delay_ms; // the delay of the car
   char lowest_floor[4];
   char highest_floor[4];
 } car_thread_data;
@@ -30,5 +30,5 @@ typedef struct
 int do_shm_open(char *shm_status_name);
 void do_ftruncate(int fd, int size);
 void init_shared_mem(car_shared_mem *shm_status_ptr, const char *lowest_floor_char);
-void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms);
-void handle_dest_floor_change(car_shared_mem *shm_status_ptr, int *delay_ms, int *lowest_floor_int, int *highest_floor_int);
+void move_floors(car_shared_mem *shm_status_ptr, int direction, __useconds_t *delay_ms);
+void handle_dest_floor_change(car_shared_mem *shm_status_ptr, __useconds_t *delay_ms, int *lowest_floor_int, int *highest_floor_int);

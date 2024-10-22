@@ -36,7 +36,7 @@ void set_between(car_shared_mem *shm_status_ptr)
   pthread_cond_broadcast(&shm_status_ptr->cond);
 }
 
-void closing_doors(car_shared_mem *shm_status_ptr, int *delay_ms)
+void closing_doors(car_shared_mem *shm_status_ptr, __useconds_t *delay_ms)
 {
   //printf("Status set to: Closing\n");
   strcpy(shm_status_ptr->status, "Closing");
@@ -67,7 +67,7 @@ void closing_doors(car_shared_mem *shm_status_ptr, int *delay_ms)
   pthread_cond_broadcast(&shm_status_ptr->cond);
 }
 
-void door_open_close(car_shared_mem *shm_status_ptr, int *delay_ms)
+void door_open_close(car_shared_mem *shm_status_ptr, __useconds_t *delay_ms)
 {
   opening_doors(shm_status_ptr);
 

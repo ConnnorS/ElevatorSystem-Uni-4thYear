@@ -43,10 +43,10 @@ int connect_to_control_system()
 
 int send_message(int socketFd, const char *message)
 {
-  int message_length = strlen(message);
-  int network_length = htonl(message_length);
+  uint32_t message_length = (uint32_t)strlen(message);
+  uint32_t network_length = htonl(message_length);
   send(socketFd, &network_length, sizeof(network_length), 0);
-  if (send(socketFd, message, message_length, 0) != message_length)
+  if (send(socketFd, message, (size_t)message_length, 0) != message_length)
   {
     printf("Send did not send all data\n");
     return -1;
@@ -60,7 +60,7 @@ int send_message(int socketFd, const char *message)
 char *receive_message(int socketFd)
 {
   char *message;
-  int length;
+  uint32_t length;
   fd_set read_fds;
   struct timeval timeout;
 
@@ -92,7 +92,7 @@ char *receive_message(int socketFd)
   }
 
   length = ntohl(length);
-  message = malloc(length + 1);
+  message = malloc((size_t)length + 1);
   if (!message)
   {
     perror("malloc failed");
@@ -100,7 +100,7 @@ char *receive_message(int socketFd)
   }
 
   /* read the message */
-  int received_length = recv(socketFd, message, length, 0);
+  uint32_t received_length = (uint32_t)recv(socketFd, message, length, 0);
   if (received_length != length)
   {
     fprintf(stderr, "recv got invalid message length\nExpected: %d got: %d\n", length, received_length);

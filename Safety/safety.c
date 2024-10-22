@@ -193,7 +193,7 @@ int data_consistent(car_shared_mem *shm_ptr)
   /* validate status */
   const char *valid_status[5] = {"Open", "Opening", "Closed", "Closing", "Between"};
   int status_is_valid = 0;
-  for (int i = 0; i < sizeof(valid_status) / sizeof(valid_status[0]); i++)
+  for (unsigned long i = 0; i < sizeof(valid_status) / sizeof(valid_status[0]); i++)
   {
     if (strcmp((char *)shm_ptr->status, valid_status[i]) == 0)
     {

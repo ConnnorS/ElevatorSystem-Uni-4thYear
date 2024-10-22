@@ -14,7 +14,7 @@ typedef struct
   int type;      // 1 for car, 0 for call pad
 
   char **queue; // array of char pointers to the items in the queue
-  int queue_length;
+  size_t queue_length;
   pthread_cond_t queue_cond; // condition to indicate some value has been updated
 
   char status[8];
@@ -32,7 +32,6 @@ typedef struct
 int create_server();
 void handle_received_car_message(client_t *client, char *message);
 void handle_received_status_message(client_t *client, char *message);
-void handle_received_call_message(client_t *client, char *message, client_t **clients, int *client_count);
+void handle_received_call_message(client_t *client, char *message, client_t **clients, size_t *client_count);
 void remove_from_queue(client_t *client);
-void remove_client(client_t *client, client_t ***clients, int *client_count);
-void calculate_direction(client_t *client);
+void remove_client(client_t *client, client_t ***clients, size_t *client_count);
