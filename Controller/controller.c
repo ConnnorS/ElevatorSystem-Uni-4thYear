@@ -19,12 +19,12 @@
 volatile sig_atomic_t system_running = 1;
 client_t **clients; // array of pointers for each client_t object
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
-int client_count = 0;
+size_t client_count = 0;
 
 /* function declarations */
 void *queue_manager(void *arg);  // manages the queue for each connected client_t and sends FLOOR messages
 void *client_handler(void *arg); // manages the incoming messages for each connected client_t and updates its info
-void system_shutdown(int sig);   // handle CTRL + C
+void system_shutdown();   // handle CTRL + C
 
 int main(void)
 {
@@ -69,7 +69,7 @@ int main(void)
   return 0;
 }
 
-void system_shutdown(int sig)
+void system_shutdown()
 {
   system_running = 0;
 }

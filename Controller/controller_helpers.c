@@ -168,7 +168,7 @@ void add_floor_at_index(client_t *client, char *floor, int *index, int *directio
   client->queue = realloc(client->queue, sizeof(char *) * client->queue_length);
 
   /* shift all the values to the right at index */
-  for (int end = client->queue_length - 1; end > *index; end--)
+  for (int end = (int)client->queue_length - 1; end > *index; end--)
   {
     client->queue[end] = client->queue[end - 1];
   }
@@ -178,7 +178,7 @@ void add_floor_at_index(client_t *client, char *floor, int *index, int *directio
 void insert_floor_in_block(client_t *client, int *index, int *floor_int, char *floor, int *direction)
 {
   int block_index = *index;
-  for (; block_index < client->queue_length; block_index++)
+  for (; block_index < (int)client->queue_length; block_index++)
   {
     char current_floor[4];
     strcpy(current_floor, client->queue[block_index] + 1); // strip off the 'U' or 'D'
@@ -217,7 +217,7 @@ void add_floors_to_queue(client_t *client, char *source, int *source_int, char *
   /* if not, find where the floor's up or down block will start */
   int index = 0;
   int found_block = 0;
-  for (; index < client->queue_length; index++)
+  for (; index < (int)client->queue_length; index++)
   {
     /* if going up - stop at the up block or if going down - stop at the down block */
     if ((client->queue[index][0] == 'U' && direction == UP) ||
@@ -255,7 +255,7 @@ void add_floors_to_queue(client_t *client, char *source, int *source_int, char *
 }
 
 /* finds the fd of the car which can service the floors then adds them to the queue */
-int find_car_for_floor(char *source, char *destination, client_t **clients, int *client_count, char *chosen_car)
+int find_car_for_floor(char *source, char *destination, client_t **clients, size_t *client_count, char *chosen_car)
 {
   int found = 0;
   client_t **options = malloc(0);
@@ -266,7 +266,7 @@ int find_car_for_floor(char *source, char *destination, client_t **clients, int 
 
   /* find the clients which can service this request */
   client_t *current;
-  for (int index = 0; index < *client_count; index++)
+  for (int index = 0; index < (int)*client_count; index++)
   {
     current = (client_t *)clients[index];
     int current_lowest_floor_int = floor_char_to_int(current->lowest_floor);
@@ -277,7 +277,7 @@ int find_car_for_floor(char *source, char *destination, client_t **clients, int 
       found = 1;
       /* add the client to our list of options */
       options_count += 1;
-      options = realloc(options, sizeof(client_t *) * options_count);
+      options = realloc(options, sizeof(client_t *) * (size_t)options_count);
       options[options_count - 1] = current;
     }
   }
@@ -300,8 +300,8 @@ int find_car_for_floor(char *source, char *destination, client_t **clients, int 
     add_floors_to_queue(current, source, &source_floor_int, destination, &destination_floor_int);
 
     // /* FOR TESTING - REMOVE LATER */
-    printf("Car %s\'s queue of length %d: ", current->name, current->queue_length);
-    for (int index = 0; index < current->queue_length; index++)
+    printf("Car %s\'s queue of length %ld: ", current->name, current->queue_length);
+    for (int index = 0; index < (int)current->queue_length; index++)
     {
       printf("%s,", current->queue[index]);
     }
@@ -316,7 +316,7 @@ int find_car_for_floor(char *source, char *destination, client_t **clients, int 
 }
 
 /* gets the desired floors of the call message and then searches for a client to service those floors */
-void handle_received_call_message(client_t *client, char *message, client_t **clients, int *client_count)
+void handle_received_call_message(client_t *client, char *message, client_t **clients, size_t *client_count)
 {
   client->type = IS_CALL;
   /* extract data */
@@ -346,7 +346,7 @@ void remove_from_queue(client_t *client)
   free(client->queue[0]);
 
   /* shift all the pointers down to overwrite the first value */
-  for (int index = 0; index < client->queue_length - 1; index++)
+  for (int index = 0; index < (int)client->queue_length - 1; index++)
   {
     client->queue[index] = client->queue[index + 1];
   }
@@ -357,13 +357,13 @@ void remove_from_queue(client_t *client)
 }
 
 /* remove the specified client from the queue */
-void remove_client(client_t *client, client_t ***clients, int *client_count)
+void remove_client(client_t *client, client_t ***clients, size_t *client_count)
 {
   if (*client_count > 1)
   {
     int index;
 
-    for (index = 0; index < *client_count; index++)
+    for (index = 0; index < (int)*client_count; index++)
     {
       if ((*clients)[index] == client)
       {
@@ -372,10 +372,10 @@ void remove_client(client_t *client, client_t ***clients, int *client_count)
     }
 
     /* if the disconnecting client is not at the end */
-    if (index < *client_count)
+    if (index < (int)*client_count)
     {
       /* shift all the elements in the clients array to the right */
-      for (; index < *client_count - 1; index++)
+      for (; index < (int)*client_count - 1; index++)
       {
         clients[index] = clients[index + 1];
       }

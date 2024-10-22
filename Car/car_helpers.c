@@ -73,7 +73,7 @@ void init_shared_mem(car_shared_mem *shm_status_ptr, const char *lowest_floor_ch
   shm_status_ptr->emergency_mode = 0;
 }
 
-void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms)
+void move_floors(car_shared_mem *shm_status_ptr, int direction, __useconds_t *delay_ms)
 {
   /* if the doors are open, close them */
   if (strcmp(shm_status_ptr->status, "Open") == 0)
@@ -112,7 +112,7 @@ void move_floors(car_shared_mem *shm_status_ptr, int direction, int *delay_ms)
   }
 }
 
-void handle_dest_floor_change(car_shared_mem *shm_status_ptr, int *delay_ms, int *lowest_floor_int, int *highest_floor_int)
+void handle_dest_floor_change(car_shared_mem *shm_status_ptr, __useconds_t *delay_ms, int *lowest_floor_int, int *highest_floor_int)
 {
   /* find the direction the car must move */
   int direction = 0;
