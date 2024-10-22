@@ -13,7 +13,6 @@
 // my functions
 #include "../common_comms.h"
 #include "../type_conversions.h"
-#include "../common_headers.h"
 
 /* {source floor} {destination floor} */
 int main(int argc, char **argv)
@@ -25,9 +24,9 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  char source_floor[FLOOR_LEN];
+  char source_floor[4];
   strcpy(source_floor, argv[1]);
-  char destination_floor[FLOOR_LEN];
+  char destination_floor[4];
   strcpy(destination_floor, argv[2]);
 
   /* validate floor ranges */
@@ -55,7 +54,7 @@ int main(int argc, char **argv)
   }
 
   /* prepare and send the message */
-  char message[MESSAGE_LEN];
+  char message[32];
   snprintf(message, sizeof(message), "CALL %s %s", source_floor, destination_floor);
   send_message(serverFd, message);
 
