@@ -15,9 +15,6 @@
 #include "../type_conversions.h"
 #include "../common_comms.h"
 
-#define UP 1
-#define DOWN -1
-
 int create_server()
 {
   struct sockaddr_in addr;
@@ -225,11 +222,11 @@ void add_floors_to_queue(client_t *client, char *source, int *source_int, char *
   /* additionally, if any of the floors fall outside the elevator's current floor - append to the end */
   int car_current_floor = floor_char_to_int(client->current_floor);
   if (
-      (direction == UP && *source_int < car_current_floor && *source_int < 0 && car_current_floor < 0) ||   // 1
-      (direction == UP && *source_int < car_current_floor && *source_int > 0 && car_current_floor > 0) ||   // 1
-      (direction == DOWN && *source_int > car_current_floor && *source_int > 0 && car_current_floor > 0) || // 1
-      (direction == DOWN && *source_int > car_current_floor && *source_int < 0 && car_current_floor < 0))   // 1
+      (client->direction == UP && direction == UP && *source_int < car_current_floor) ||
+      (client->direction == DOWN && direction == DOWN && *source_int > car_current_floor))
+
   {
+    printf("Found block but floors fall out of car's current range - appending\n");
     append_floors(client, source_int, destination_int, &direction);
     return;
   }

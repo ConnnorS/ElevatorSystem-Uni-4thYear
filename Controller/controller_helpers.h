@@ -3,6 +3,10 @@
 #define IS_CAR 1
 #define IS_CALL 0
 
+#define UP 1
+#define DOWN -1
+#define STILL 0
+
 typedef struct
 {
   int fd;        // file descriptor of the client
@@ -16,6 +20,7 @@ typedef struct
   char status[8];
   char current_floor[4];     // the current floor of the car
   char destination_floor[4]; // the destination floor of the car
+  int direction;             // 1 for UP, -1 for DOWN
 
   char lowest_floor[4];  // the lowest serviceable floor of the car
   char highest_floor[4]; // the highest serviceable floor of the car
