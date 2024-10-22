@@ -144,25 +144,21 @@ int main(int argc, char **argv)
     {
       if (in_emergency_mode)
       {
-        printf("Car leaving emergency mode\n");
         shm_status_ptr->emergency_mode = 0;
         in_emergency_mode = 0;
       }
-      printf("Car entering service mode\n");
       handle_service_mode(shm_status_ptr);
       in_service_mode = 1;
     }
     /* if internals tells the car to leave service mode */
     else if (!shm_status_ptr->individual_service_mode && in_service_mode)
     {
-      printf("Car leaving service mode\n");
       in_service_mode = 0;
       pthread_create(&server_send_handler, NULL, control_system_send_handler, thread_data); // spin up a new thread again
     }
     /* if placed into emergency mode for the first time */
     else if (shm_status_ptr->emergency_mode && !in_emergency_mode)
     {
-      printf("Car entering emergency mode\n");
       in_emergency_mode = 1;
       shm_status_ptr->emergency_stop = 0;
     }
@@ -223,7 +219,6 @@ int main(int argc, char **argv)
 
   pthread_mutex_destroy(&shm_status_ptr->mutex);
   pthread_cond_destroy(&shm_status_ptr->cond);
-  printf("Destroyed mutexes and conds\n");
 
   /* do the cleanup when the threads end */
   if (shm_unlink(shm_status_name) == -1)
@@ -240,7 +235,6 @@ int main(int argc, char **argv)
 /* handles sending messages to the controller */
 void *control_system_send_handler(void *args)
 {
-  printf("Control system send thread started\n");
 
   car_thread_data *car = (car_thread_data *)args;
   __useconds_t delay_ms = car->delay_ms;
@@ -264,7 +258,6 @@ void *control_system_send_handler(void *args)
   /* send the initial identification message */
   char car_id[64];
   snprintf(car_id, sizeof(car_id), "CAR %s %s %s", name, car->lowest_floor, car->highest_floor);
-  printf("Sending identification message...\n");
   while (system_running)
   {
     if (send_message(socketFd, (char *)car_id) != -1)
@@ -312,7 +305,6 @@ void *control_system_send_handler(void *args)
   /* wait for the receive handler to close then close everything off */
   pthread_join(server_receive_handler, NULL);
   close(socketFd);
-  printf("Send thread ending\n");
   return NULL;
 }
 
@@ -322,7 +314,6 @@ void *control_system_receive_handler(void *args)
   car_thread_data *car = (car_thread_data *)args;
   int fd = car->fd;
 
-  printf("Control system receive thread started\n");
 
   while (system_running && !in_service_mode && !in_emergency_mode && controller_connected)
   {
@@ -330,7 +321,6 @@ void *control_system_receive_handler(void *args)
     /* tell the other thread to shutdown - the controller has disconnected */
     if (message == NULL)
     {
-      printf("Controller disconnected\n");
       controller_connected = 0;
       pthread_mutex_lock(&shm_status_ptr->mutex);
       pthread_cond_broadcast(&shm_status_ptr->cond);
@@ -351,7 +341,6 @@ void *control_system_receive_handler(void *args)
       pthread_mutex_unlock(&shm_status_ptr->mutex);
     }
   }
-  printf("Receive thread ending\n");
   return NULL;
 }
 

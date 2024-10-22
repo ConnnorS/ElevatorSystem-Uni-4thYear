@@ -148,7 +148,6 @@ void append_floors(client_t *client, int *source_floor, int *destination_floor, 
 
 void add_floor_at_index(client_t *client, char *floor, int *index, int *direction)
 {
-  printf("Inserting %s at index %d\n", floor, *index);
   /* allocate memory for the new floor */
   char new_floor[5];
   if (*direction == UP)
@@ -209,7 +208,6 @@ void add_floors_to_queue(client_t *client, char *source, int *source_int, char *
   /* if the queue is empty, just append the floors */
   if (client->queue_length == 0)
   {
-    printf("Queue is empty - appending floors\n");
     append_floors(client, source_int, destination_int, &direction);
     return;
   }
@@ -223,7 +221,6 @@ void add_floors_to_queue(client_t *client, char *source, int *source_int, char *
     if ((client->queue[index][0] == 'U' && direction == UP) ||
         (client->queue[index][0] == 'D' && direction == DOWN))
     {
-      printf("Found block at index %d\n", index);
       found_block = 1;
       break;
     }
@@ -232,7 +229,6 @@ void add_floors_to_queue(client_t *client, char *source, int *source_int, char *
   /* if we didn't find a block - append to start a new block */
   if (!found_block)
   {
-    printf("No block found - appending floors\n");
     append_floors(client, source_int, destination_int, &direction);
     return;
   }
@@ -244,7 +240,6 @@ void add_floors_to_queue(client_t *client, char *source, int *source_int, char *
       (client->direction == DOWN && direction == DOWN && *source_int > car_current_floor))
 
   {
-    printf("Found block but floors fall out of car's current range - appending\n");
     append_floors(client, source_int, destination_int, &direction);
     return;
   }
@@ -299,14 +294,6 @@ int find_car_for_floor(char *source, char *destination, client_t **clients, size
     /* add the floors to their queue */
     add_floors_to_queue(current, source, &source_floor_int, destination, &destination_floor_int);
 
-    // /* FOR TESTING - REMOVE LATER */
-    printf("Car %s\'s queue of length %ld: ", current->name, current->queue_length);
-    for (int index = 0; index < (int)current->queue_length; index++)
-    {
-      printf("%s,", current->queue[index]);
-    }
-    printf("\n");
-
     /* signal the watching queue thread to wake up */
     pthread_cond_signal(&current->queue_cond);
   }
@@ -322,13 +309,11 @@ void handle_received_call_message(client_t *client, char *message, client_t **cl
   /* extract data */
   char source[4], destination[4];
   sscanf(message, "%*s %3s %3s", source, destination);
-  printf("Received call message for %s-%s\n", source, destination);
 
   /* find car to service */
   char chosen_car[64];
   if (find_car_for_floor(source, destination, clients, client_count, chosen_car))
   {
-    printf("%s can service this request\n", chosen_car);
     char response[68];
     snprintf(response, sizeof(response), "Car %s", chosen_car);
     send_message(client->fd, response);
