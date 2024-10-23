@@ -1,7 +1,6 @@
 #include <pthread.h>
 #include <stdint.h>
 
-/* struct definitions */
 typedef struct
 {
   pthread_mutex_t mutex;           // Locked while accessing struct contents
@@ -18,12 +17,13 @@ typedef struct
   uint8_t emergency_mode;          // 1 if in emergency mode, else 0
 } car_shared_mem;
 
+/* structure to send data into the threads that they need */
 typedef struct
 {
-  int fd;       // file descriptor of the connected server
+  int fd;                // file descriptor of the connected server
   __useconds_t delay_ms; // the delay of the car
-  char lowest_floor[4];
-  char highest_floor[4];
+  char lowest_floor[4];  // car's lowest serviceable floor
+  char highest_floor[4]; // car's highest serviceable floor
 } car_thread_data;
 
 /* functions used by the car component */
