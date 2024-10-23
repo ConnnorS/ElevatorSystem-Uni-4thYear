@@ -303,6 +303,7 @@ void *control_system_send_handler(void *args)
     {
       send_message(socketFd, "EMERGENCY");
     }
+    close(socketFd);
   }
   /* wait for the receive handler to close then close everything off */
   pthread_join(server_receive_handler, NULL);
