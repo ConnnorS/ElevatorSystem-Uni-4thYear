@@ -337,6 +337,7 @@ void *control_system_receive_handler(void *args)
     /* update the destination floor for the main thread to then move floors */
     else if (strncmp(message, "FLOOR", 5) == 0)
     {
+      printf("Received message %s\n", message);
       char floor_num[4];
       sscanf(message, "%*s %s", floor_num);
       pthread_mutex_lock(&shm_status_ptr->mutex);
