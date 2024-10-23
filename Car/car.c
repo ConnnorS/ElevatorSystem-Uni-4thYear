@@ -22,7 +22,7 @@ char *name;                                     // name of car
 volatile sig_atomic_t system_running = 1;       // allows the entire car component to shut down
 volatile sig_atomic_t in_service_mode = 0;      // tells the threads if the car is in service mode
 volatile sig_atomic_t in_emergency_mode = 0;    // tells the threads if the car is in emergency mode
-volatile sig_atomic_t controller_connected = 1; // tells the threads if the controller is connected
+volatile sig_atomic_t controller_connected = 0; // tells the threads if the controller is connected
 car_shared_mem *shm_status_ptr;                 // pointer to shared mem
 pthread_t server_receive_handler;               // therad to handle receiving messages from the control system
 pthread_t server_send_handler;                  // thread to handle sending status messages to the control system
@@ -235,12 +235,10 @@ int main(int argc, char **argv)
 /* handles sending messages to the controller */
 void *control_system_send_handler(void *args)
 {
-
   car_thread_data *car = (car_thread_data *)args;
   __useconds_t delay_ms = car->delay_ms;
   int socketFd;
-
-  while (system_running)
+  while (system_running && !in_service_mode && !in_emergency_mode)
   {
     /* connect to the control system */
     socketFd = connect_to_control_system();
@@ -256,61 +254,56 @@ void *control_system_send_handler(void *args)
     car->fd = socketFd;
     controller_connected = 1;
 
-    while (controller_connected && system_running)
+    /* now create the receive thread once connected to the control system */
+    pthread_create(&server_receive_handler, NULL, control_system_receive_handler, car);
+
+    /* send the initial identification message */
+    char car_id[64];
+    snprintf(car_id, sizeof(car_id), "CAR %s %s %s", name, car->lowest_floor, car->highest_floor);
+    while (system_running)
     {
-      /* now create the receive thread once connected to the control system */
-      pthread_create(&server_receive_handler, NULL, control_system_receive_handler, car);
-
-      /* send the initial identification message */
-      char car_id[64];
-      snprintf(car_id, sizeof(car_id), "CAR %s %s %s", name, car->lowest_floor, car->highest_floor);
-      while (system_running)
+      if (send_message(socketFd, (char *)car_id) != -1)
       {
-        if (send_message(socketFd, (char *)car_id) != -1)
-        {
-          break;
-        }
-        usleep(delay_ms * 1000);
+        break;
       }
+      usleep(delay_ms * 1000);
+    }
 
-      /* constantly send status messages every delay_ms or when data changes */
-      while (system_running && !in_service_mode && !in_emergency_mode && controller_connected)
-      {
-        /* prepare the message */
-        char status_data[64];
-        pthread_mutex_lock(&shm_status_ptr->mutex);
-        snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", shm_status_ptr->status, shm_status_ptr->current_floor, shm_status_ptr->destination_floor);
-        pthread_mutex_unlock(&shm_status_ptr->mutex);
-        /* send the message */
-        send_message(socketFd, (char *)status_data);
+    /* constantly send status messages every delay_ms or when data changes */
+    while (system_running && !in_service_mode && !in_emergency_mode && controller_connected)
+    {
+      /* prepare the message */
+      char status_data[64];
+      pthread_mutex_lock(&shm_status_ptr->mutex);
+      snprintf(status_data, sizeof(status_data), "STATUS %s %s %s", shm_status_ptr->status, shm_status_ptr->current_floor, shm_status_ptr->destination_floor);
+      pthread_mutex_unlock(&shm_status_ptr->mutex);
+      /* send the message */
+      send_message(socketFd, (char *)status_data);
 
-        /* wait for status update with a timeout */
-        struct timespec ts;
-        clock_gettime(CLOCK_REALTIME, &ts);
-        ts.tv_sec += delay_ms / 1000;
-        ts.tv_nsec += (delay_ms % 1000) * 1000000;
-        if (ts.tv_nsec >= 1000000000)
-        {
-          ts.tv_sec += 1;
-          ts.tv_nsec -= 1000000000;
-        }
-        pthread_mutex_lock(&shm_status_ptr->mutex);
-        pthread_cond_timedwait(&shm_status_ptr->cond, &shm_status_ptr->mutex, &ts);
-        pthread_mutex_unlock(&shm_status_ptr->mutex);
+      /* wait for status update with a timeout */
+      struct timespec ts;
+      clock_gettime(CLOCK_REALTIME, &ts);
+      ts.tv_sec += delay_ms / 1000;
+      ts.tv_nsec += (delay_ms % 1000) * 1000000;
+      if (ts.tv_nsec >= 1000000000)
+      {
+        ts.tv_sec += 1;
+        ts.tv_nsec -= 1000000000;
       }
+      pthread_mutex_lock(&shm_status_ptr->mutex);
+      pthread_cond_timedwait(&shm_status_ptr->cond, &shm_status_ptr->mutex, &ts);
+      pthread_mutex_unlock(&shm_status_ptr->mutex);
+    }
 
-      if (in_service_mode)
-      {
-        send_message(socketFd, "INDIVIDUAL SERVICE");
-      }
-      else if (in_emergency_mode)
-      {
-        send_message(socketFd, "EMERGENCY");
-      }
-      close(socketFd);
+    if (in_service_mode)
+    {
+      send_message(socketFd, "INDIVIDUAL SERVICE");
+    }
+    else if (in_emergency_mode)
+    {
+      send_message(socketFd, "EMERGENCY");
     }
   }
-
   /* wait for the receive handler to close then close everything off */
   pthread_join(server_receive_handler, NULL);
   close(socketFd);
@@ -337,7 +330,7 @@ void *control_system_receive_handler(void *args)
     /* update the destination floor for the main thread to then move floors */
     else if (strncmp(message, "FLOOR", 5) == 0)
     {
-      printf("Received message %s\n", message);
+      //printf("Received message %s\n", message);
       char floor_num[4];
       sscanf(message, "%*s %s", floor_num);
       pthread_mutex_lock(&shm_status_ptr->mutex);
