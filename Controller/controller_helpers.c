@@ -315,7 +315,7 @@ void handle_received_call_message(client_t *client, char *message, client_t **cl
   if (find_car_for_floor(source, destination, clients, client_count, chosen_car))
   {
     char response[68];
-    snprintf(response, sizeof(response), "Car %s", chosen_car);
+    snprintf(response, sizeof(response), "CAR %s", chosen_car);
     send_message(client->fd, response);
   }
   else
