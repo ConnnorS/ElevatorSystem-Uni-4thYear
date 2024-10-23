@@ -58,6 +58,7 @@ int main(int argc, char **argv)
   if (argc != 2)
   {
     printf("Usage: {car name}\n");
+    fflush(stdout);
     return 1;
   }
 
@@ -67,12 +68,14 @@ int main(int argc, char **argv)
   if (argv[1] == NULL)
   {
     printf("Invalid car name\n");
+    fflush(stdout);
     return 1;
   }
   char shm_status_name[64] = "";
   if (snprintf(shm_status_name, sizeof(shm_status_name), "/car%s", argv[1]) == -1)
   {
     printf("Error parsing car name\n");
+    fflush(stdout);
     return 1;
   }
 
@@ -82,10 +85,12 @@ int main(int argc, char **argv)
     if (argv[1] == NULL)
     {
       printf("Unable to access car\n");
+      fflush(stdout);
     }
     else
     {
       printf("Unable to access car %s.\n", argv[1]);
+      fflush(stdout);
     }
     return 1;
   }
@@ -105,6 +110,7 @@ int main(int argc, char **argv)
     if (pthread_mutex_lock(&shm_status_ptr->mutex) != 0)
     {
       printf("Mutex lock failed\n");
+      fflush(stdout);
       return 1;
     }
 
@@ -119,6 +125,7 @@ int main(int argc, char **argv)
       if (pthread_cond_wait(&shm_status_ptr->cond, &shm_status_ptr->mutex) != 0)
       {
         printf("Pthread wait failed\n");
+        fflush(stdout);
         pthread_mutex_unlock(&shm_status_ptr->mutex);
         return 1;
       }
@@ -133,18 +140,21 @@ int main(int argc, char **argv)
     else if (shm_status_ptr->emergency_stop == 1 && shm_status_ptr->emergency_mode == 0)
     {
       printf("The emergency stop button has been pressed!\n");
+      fflush(stdout);
       shm_status_ptr->emergency_mode = 1;
     }
     /* overload */
     else if (shm_status_ptr->overload == 1 && shm_status_ptr->emergency_mode == 0)
     {
       printf("The overload sensor has been tripped!\n");
+      fflush(stdout);
       shm_status_ptr->emergency_mode = 1;
     }
     /* data error */
     else if (!data_consistent(shm_status_ptr))
     {
       printf("Data consistency error!\n");
+      fflush(stdout);
       shm_status_ptr->emergency_mode = 1;
     }
     /* Rule 14.10 - always requires an else statement */
@@ -153,6 +163,7 @@ int main(int argc, char **argv)
       if (shm_status_ptr == NULL)
       {
         printf("Unexpected condition detected. SHM pointer is null\n");
+        fflush(stdout);
         return 1;
       }
     }
@@ -161,6 +172,7 @@ int main(int argc, char **argv)
     if (pthread_mutex_unlock(&shm_status_ptr->mutex) != 0)
     {
       printf("Mutex unlock failed\n");
+      fflush(stdout);
       return 1;
     }
   }
@@ -169,6 +181,7 @@ int main(int argc, char **argv)
   if (munmap(shm_status_ptr, sizeof(car_shared_mem)) == -1)
   {
     printf("munmap failed\n");
+    fflush(stdout);
   }
 
   close(shm_status_fd);

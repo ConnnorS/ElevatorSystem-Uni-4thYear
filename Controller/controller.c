@@ -24,7 +24,7 @@ size_t client_count = 0;
 /* function declarations */
 void *queue_manager(void *arg);  // manages the queue for each connected client_t and sends FLOOR messages
 void *client_handler(void *arg); // manages the incoming messages for each connected client_t and updates its info
-void system_shutdown();   // handle CTRL + C
+void system_shutdown();          // handle CTRL + C
 
 int main(void)
 {
@@ -85,7 +85,6 @@ void *client_handler(void *arg)
   int fd = client->fd; // local variable to avoid constant mutex locking/unlocking
   client->queue = malloc(0);
   client->queue_length = 0;
-  printf("New client connected with fd %d\n", client->fd);
   pthread_mutex_unlock(&clients_mutex);
 
   while (system_running && client->connected)
@@ -102,7 +101,6 @@ void *client_handler(void *arg)
     else if (strncmp(message, "CAR", 3) == 0)
     {
       handle_received_car_message(client, message);
-      printf("New car connected: %s %s %s\n", client->name, client->lowest_floor, client->highest_floor);
       pthread_create(&queue_manager_thread, NULL, queue_manager, (void *)client);
       client->type = IS_CAR;
     }
@@ -110,9 +108,7 @@ void *client_handler(void *arg)
     else if (strncmp(message, "STATUS", 6) == 0)
     {
       handle_received_status_message(client, message);
-      printf("Received status message from %s: %s %s %s\n", client->name, client->status, client->current_floor, client->destination_floor);
-      printf("Client's direction is currently: %s\n", client->direction == UP ? "UP" : client->direction == DOWN ? "DOWN"
-                                                                                                                 : "STILL");
+      //printf("Received status message from car %s %s\n", client->name, message);
     }
     /* call pad connected */
     else if (strncmp(message, "CALL", 4) == 0)
@@ -121,11 +117,6 @@ void *client_handler(void *arg)
       /* call pads don't need to stay connected so thread can end */
       pthread_mutex_unlock(&clients_mutex);
       break;
-    }
-    /* car in service mode or emergency mode */
-    else if (strcmp(message, "INDIVIDUAL SERVICE") == 0 || strcmp(message, "EMERGENCY") == 0)
-    {
-      printf("Car %s is in %s\n", client->name, message);
     }
 
     pthread_mutex_unlock(&clients_mutex);
@@ -143,7 +134,6 @@ void *client_handler(void *arg)
   }
 
   pthread_mutex_lock(&clients_mutex);
-  printf("Client handler thread for %s ending\n", client->name);
   remove_client(client, &clients, &client_count);
   pthread_mutex_unlock(&clients_mutex);
 
@@ -154,6 +144,8 @@ void *client_handler(void *arg)
 void *queue_manager(void *arg)
 {
   client_t *client = arg;
+
+  char last_floor_sent[4] = "";
 
   while (system_running && client->connected)
   {
@@ -181,21 +173,26 @@ void *queue_manager(void *arg)
       pthread_mutex_unlock(&clients_mutex);
       break;
     }
+    /* if client current = destination and its current floor is the last floor sent - the client has hit its destination floor */
+    if (client->queue_length > 0 &&
+        strcmp(client->current_floor, client->destination_floor) == 0 &&
+        strcmp(last_floor_sent, client->current_floor) == 0)
+    {
+      remove_from_queue(client);
+      strcpy(last_floor_sent, "");
+    }
 
     /* if the destination floor does not match the first floor in the queue - send a new floor request
     only if the client's doors are "Opening" or "Closed" */
-    if (client->queue_length > 0 && strcmp(client->destination_floor, client->queue[0] + 1) != 0 &&
-        (strcmp(client->status, "Opening") == 0 || strcmp(client->status, "Closed") == 0))
+    if (client->queue_length > 0 &&
+        (strcmp(client->status, "Opening") == 0 || strcmp(client->status, "Closed") == 0) &&
+        (strcmp(client->current_floor, client->queue[0] + 1) == 0 || strcmp(client->destination_floor, client->queue[0] + 1) != 0))
     {
       char message[16];
       strcpy(client->destination_floor, client->queue[0] + 1);
       snprintf(message, sizeof(message), "FLOOR %s", client->destination_floor);
+      strcpy(last_floor_sent, client->destination_floor);
       send_message(client->fd, message);
-    }
-    /* if the client hits the destination floor we can now remove that floor from the queue triggering the above if statement */
-    if (client->queue_length > 0 && strcmp(client->current_floor, client->destination_floor) == 0)
-    {
-      remove_from_queue(client);
     }
 
     pthread_mutex_unlock(&clients_mutex);
@@ -203,7 +200,6 @@ void *queue_manager(void *arg)
 
   /* upon thread end */
   pthread_mutex_lock(&clients_mutex);
-  printf("Queue manager thread for %s ending\n", client->name);
   pthread_mutex_unlock(&clients_mutex);
   return NULL;
 }
