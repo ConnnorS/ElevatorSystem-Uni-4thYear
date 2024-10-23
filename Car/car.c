@@ -24,8 +24,8 @@ volatile sig_atomic_t in_service_mode = 0;      // tells the threads if the car 
 volatile sig_atomic_t in_emergency_mode = 0;    // tells the threads if the car is in emergency mode
 volatile sig_atomic_t controller_connected = 1; // tells the threads if the controller is connected
 car_shared_mem *shm_status_ptr;                 // pointer to shared mem
-pthread_t server_receive_handler;
-pthread_t server_send_handler;
+pthread_t server_receive_handler;               // therad to handle receiving messages from the control system
+pthread_t server_send_handler;                  // thread to handle sending status messages to the control system
 
 /* function declarations */
 void system_shutdown();
