@@ -1,0 +1,2 @@
+- too many pthread cond signals when the state of the car changes (causes test cases to become out of sync) look at test car 3
+- some strange receives in the test controller bits - will need to fix
