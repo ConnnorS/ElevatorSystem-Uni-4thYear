@@ -344,11 +344,20 @@ void remove_from_queue(client_t *client)
 /* remove the specified client from the queue */
 void remove_client(client_t *client, client_t ***clients, size_t *client_count)
 {
-  if (*client_count > 1)
+  if ((int)*client_count == 0)
   {
-    int index;
+    return;
+  }
+  else
+  {
+    /* free everything */
+    free(client->queue);
+    pthread_cond_destroy(&client->queue_cond);
+    free(client);
 
-    for (index = 0; index < (int)*client_count; index++)
+    /* find the index of the client */
+    int index = 0;
+    for (; index < (int)*client_count; index++)
     {
       if ((*clients)[index] == client)
       {
@@ -356,23 +365,14 @@ void remove_client(client_t *client, client_t ***clients, size_t *client_count)
       }
     }
 
-    /* if the disconnecting client is not at the end */
-    if (index < (int)*client_count)
+    /* shift all client elements down one */
+    for (; index < (int)*client_count - 1; index++)
     {
-      /* shift all the elements in the clients array to the right */
-      for (; index < (int)*client_count - 1; index++)
-      {
-        clients[index] = clients[index + 1];
-      }
+      (*clients)[index] = (*clients)[index + 1];
     }
-    *clients = realloc(*clients, sizeof(client_t *) * (*client_count - 1));
   }
+  *client_count -= 1;
 
-  /* realloc memory */
-  *client_count = *client_count - 1;
-
-  /* finally, free the client object and associated pointers */
-  free(client->queue);
-  pthread_cond_destroy(&client->queue_cond);
-  free(client);
+  /* finally, realloc memory */
+  *clients = realloc(*clients, sizeof(client_t *) * (*client_count));
 }
