@@ -108,7 +108,6 @@ void *client_handler(void *arg)
     else if (strncmp(message, "STATUS", 6) == 0)
     {
       handle_received_status_message(client, message);
-      printf("Received status message from %s %s\n", client->name, message);
     }
     /* call pad connected */
     else if (strncmp(message, "CALL", 4) == 0)
