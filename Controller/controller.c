@@ -108,11 +108,7 @@ void *client_handler(void *arg)
     else if (strncmp(message, "STATUS", 6) == 0)
     {
       handle_received_status_message(client, message);
-<<<<<<< HEAD
-      //printf("Received status message from car %s %s\n", client->name, message);
-=======
-      printf("Received status message from %s %s\n", client->name, message);
->>>>>>> parent of bf293cf (Removed printfs again)
+      //printf("Received status message from %s %s\n", client->name, message);
     }
     /* call pad connected */
     else if (strncmp(message, "CALL", 4) == 0)
