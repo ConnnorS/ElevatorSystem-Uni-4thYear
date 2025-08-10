@@ -1,0 +1,20 @@
+{
+  "files.associations": {
+    "inet.h": "c",
+    "stdlib.h": "c",
+    "common_comms.h": "c",
+    "controller_helpers.h": "c",
+    "car_helpers.h": "c",
+    "safety_helpers.h": "c",
+    "car_status_operations.h": "c",
+    "array": "c",
+    "string": "c",
+    "string_view": "c",
+    "mman.h": "c",
+    "stdint.h": "c",
+    "type_conversions.h": "c",
+    "typeinfo": "cpp",
+    "string.h": "c",
+    "pthread.h": "c"
+  }
+}
